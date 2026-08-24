@@ -13,6 +13,10 @@ add_subdirectory(XenosRecomp EXCLUDE_FROM_ALL)
 target_compile_definitions(XenosRecomp PRIVATE REBLUE_RECOMP)
 target_precompile_headers(XenosRecomp PRIVATE <fmt/format.h>)
 
+if(REBLUE_BUILD_INSTALLER)
+    add_subdirectory(VDFLib EXCLUDE_FROM_ALL)
+endif()
+
 if(NOT TARGET xxHash::xxhash)
     set(XXHASH_BUILD_XXHSUM OFF CACHE BOOL "" FORCE)
     set(build_shared_prev ${BUILD_SHARED_LIBS})

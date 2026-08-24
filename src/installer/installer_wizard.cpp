@@ -8,8 +8,11 @@
 #include "installer/installer_wizard.h"
 
 #include <imgui.h>
+#include <rex/filesystem.h>
 #include <rex/filesystem/devices/disc_image_device.h>
+#include <rex/platform/env.h>
 #include <stb_image.h>
+#include <vdflib.h>
 
 #include <algorithm>
 #include <cstring>
@@ -36,6 +39,55 @@ const char *T(const char *key) { return i18n::Text(key).c_str(); }
 ImFont *g_body_font = nullptr;
 ImFont *g_title_font = nullptr;
 ImFont *g_path_font = nullptr;
+
+std::filesystem::path ExecutablePath() {
+#if !defined(_WIN32)
+  if (auto appimage = rex::platform::env::get("APPIMAGE");
+      appimage && !appimage->empty())
+    return std::filesystem::absolute(*appimage);
+#endif
+  auto path = rex::filesystem::GetExecutableFolder();
+#if defined(_WIN32)
+  return path / "reblue.exe";
+#elif defined(__APPLE__)
+  // Inside a .app bundle the executable sits at Contents/MacOS/reblue; point
+  // Steam at the bundle itself so it launches (and shows an icon) like any
+  // other Mac app instead of a bare Unix binary.
+  if (path.filename() == "MacOS" && path.parent_path().filename() == "Contents") {
+    const auto bundle = path.parent_path().parent_path();
+    if (bundle.extension() == ".app")
+      return bundle;
+  }
+  return path / "reblue";
+#else
+  return path / "reblue";
+#endif
+}
+
+std::string AddSteamShortcut() {
+  try {
+    const auto steam = vdflib::findSteamInstallPath();
+    if (!steam) return i18n::Text("installer.steam.not_found");
+    const auto users = vdflib::listLocalSteamUserIds(*steam);
+    if (users.empty()) return i18n::Text("installer.steam.no_users");
+
+    const auto exe = ExecutablePath();
+    auto shortcut = vdflib::Shortcut::create(
+        "re:Blue", exe.string(), exe.parent_path().string());
+    vdflib::ShortcutRepository repository(
+        vdflib::getShortcutsVdfPath(*steam, users.front()));
+    repository.load();
+    if (!repository.findByAppId(shortcut.appid)) {
+      repository.addShortcut(std::move(shortcut));
+      repository.save();
+    }
+    BD_INFO("InstallerWizard: added Steam shortcut for user {}", users.front());
+    return i18n::Text("installer.steam.added");
+  } catch (const std::exception& e) {
+    BD_WARN("InstallerWizard: could not add Steam shortcut: {}", e.what());
+    return i18n::Fmt("installer.steam.failed", e.what());
+  }
+}
 } // namespace
 
 void InitInstallerFonts(ImFontAtlas *atlas) {
@@ -478,6 +530,10 @@ void InstallerWizard::DrawContent() {
                T(repair_ ? "installer.hint.existing" : "installer.hint.space"),
                install_dir_, "install_dir", [this]() { PickInstallDir(); });
 
+  ImGui::Checkbox(T("installer.steam.checkbox"), &add_steam_shortcut_);
+  if (ImGui::IsItemHovered())
+    ImGui::SetTooltip("%s", T("installer.steam.hint"));
+
   ImGui::Dummy(ImVec2(0, 10));
   DrawDLCSection();
   DrawFooter();
@@ -792,6 +848,8 @@ void InstallerWizard::DrawInstalling() {
       done_success_ = true;
       done_message_ = i18n::Text(repair_ ? "installer.done.repair_complete"
                                          : "installer.done.complete");
+      if (add_steam_shortcut_)
+        done_message_ += "\n\n" + AddSteamShortcut();
       page_ = Page::Done;
     }
   }

@@ -138,6 +138,7 @@ private:
   bool update_check_ = false;
   bool create_shortcut_ = false;
   bool reset_config_ = false;
+  bool add_steam_shortcut_ = false;
 
   InstallProgress progress_;
   std::thread install_thread_;
