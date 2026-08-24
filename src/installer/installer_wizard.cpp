@@ -110,6 +110,23 @@ void InstallSteamArtwork(const std::filesystem::path& grid_dir,
   }
 }
 
+// Writes the app's own .ico out to the grid dir under the shortcut's app ID
+// and returns that path. This is the small icon Steam shows in the library
+// list/sidebar; distinct from (and unrelated to) the grid/hero/logo/capsule
+// artwork above, which only appears in the big-picture-style views.
+std::filesystem::path InstallSteamIcon(const std::filesystem::path& grid_dir,
+                                       uint32_t app_id) {
+  constexpr auto kIcon = bd::Embedded("installer/reblue.ico");
+  std::filesystem::create_directories(grid_dir);
+  const auto dest = grid_dir / (std::to_string(app_id) + "_icon.ico");
+  std::ofstream out(dest, std::ios::binary | std::ios::trunc);
+  out.write(reinterpret_cast<const char*>(kIcon.data),
+            static_cast<std::streamsize>(kIcon.size));
+  out.close();
+  if (!out) throw std::runtime_error("failed to install Steam icon");
+  return dest;
+}
+
 std::string AddSteamShortcut() {
   try {
     const auto steam = vdflib::findSteamInstallPath();
@@ -121,14 +138,25 @@ std::string AddSteamShortcut() {
     auto shortcut = vdflib::Shortcut::create(
         "re:Blue", exe.string(), exe.parent_path().string());
     const uint32_t app_id = shortcut.appid;
+    const auto grid_dir = vdflib::getGridDirectory(*steam, users.front());
+    const auto icon_path = InstallSteamIcon(grid_dir, app_id).string();
+
     vdflib::ShortcutRepository repository(
         vdflib::getShortcutsVdfPath(*steam, users.front()));
     repository.load();
-    if (!repository.findByAppId(shortcut.appid)) {
+    // A shortcut added before this icon existed never got one; catch it up
+    // rather than only setting the icon on brand-new entries.
+    if (auto* existing = repository.findByAppId(app_id)) {
+      if (existing->icon != icon_path) {
+        existing->icon = icon_path;
+        repository.save();
+      }
+    } else {
+      shortcut.icon = icon_path;
       repository.addShortcut(std::move(shortcut));
       repository.save();
     }
-    InstallSteamArtwork(vdflib::getGridDirectory(*steam, users.front()), app_id);
+    InstallSteamArtwork(grid_dir, app_id);
     BD_INFO("InstallerWizard: added Steam shortcut for user {}", users.front());
     return i18n::Text("installer.steam.added");
   } catch (const std::exception& e) {
