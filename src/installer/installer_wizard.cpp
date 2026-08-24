@@ -16,7 +16,9 @@
 
 #include <algorithm>
 #include <cstring>
+#include <fstream>
 #include <functional>
+#include <stdexcept>
 
 #include "core/app_root.h"
 #include "core/encoding.h"
@@ -64,6 +66,50 @@ std::filesystem::path ExecutablePath() {
 #endif
 }
 
+// Writes each embedded grid image out to a scratch dir (vdflib installs
+// artwork from a source file path, not a memory buffer) and hands it off to
+// vdflib to copy into Steam's per-user grid directory under the right name
+// for its slot.
+void InstallSteamArtwork(const std::filesystem::path& grid_dir,
+                         uint32_t app_id) {
+  struct ArtworkFile {
+    const char* name;
+    bd::EmbeddedAsset asset;
+    vdflib::ArtworkSlot slot;
+  };
+  constexpr auto kCover = bd::Embedded("installer/steamgrid/cover.png");
+  constexpr auto kHero = bd::Embedded("installer/steamgrid/hero.png");
+  constexpr auto kLogo = bd::Embedded("installer/steamgrid/logo.png");
+  constexpr auto kBackdrop = bd::Embedded("installer/steamgrid/backdropbd.png");
+  const ArtworkFile files[] = {
+      {"cover.png", kCover, vdflib::ArtworkSlot::Portrait},
+      {"hero.png", kHero, vdflib::ArtworkSlot::Hero},
+      {"logo.png", kLogo, vdflib::ArtworkSlot::Logo},
+      {"backdropbd.png", kBackdrop, vdflib::ArtworkSlot::Capsule},
+  };
+
+  const auto temp_dir = std::filesystem::temp_directory_path() /
+                        ("reblue-steamgrid-" + std::to_string(app_id));
+  std::filesystem::create_directories(temp_dir);
+  struct TempDirGuard {
+    std::filesystem::path path;
+    ~TempDirGuard() {
+      std::error_code ec;
+      std::filesystem::remove_all(path, ec);
+    }
+  } guard{temp_dir};
+
+  for (const auto& file : files) {
+    const auto source = temp_dir / file.name;
+    std::ofstream out(source, std::ios::binary | std::ios::trunc);
+    out.write(reinterpret_cast<const char*>(file.asset.data),
+              static_cast<std::streamsize>(file.asset.size));
+    out.close();
+    if (!out || !vdflib::installLocalArtwork(grid_dir, app_id, file.slot, source))
+      throw std::runtime_error(std::string("failed to install ") + file.name);
+  }
+}
+
 std::string AddSteamShortcut() {
   try {
     const auto steam = vdflib::findSteamInstallPath();
@@ -74,6 +120,7 @@ std::string AddSteamShortcut() {
     const auto exe = ExecutablePath();
     auto shortcut = vdflib::Shortcut::create(
         "re:Blue", exe.string(), exe.parent_path().string());
+    const uint32_t app_id = shortcut.appid;
     vdflib::ShortcutRepository repository(
         vdflib::getShortcutsVdfPath(*steam, users.front()));
     repository.load();
@@ -81,6 +128,7 @@ std::string AddSteamShortcut() {
       repository.addShortcut(std::move(shortcut));
       repository.save();
     }
+    InstallSteamArtwork(vdflib::getGridDirectory(*steam, users.front()), app_id);
     BD_INFO("InstallerWizard: added Steam shortcut for user {}", users.front());
     return i18n::Text("installer.steam.added");
   } catch (const std::exception& e) {
