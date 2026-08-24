@@ -107,6 +107,7 @@ private:
 
   void InitDLCCatalog();
   void PickAndInstallDLC();
+  void AddSteamShortcutOnly();
 
   rex::ui::WindowedAppContext &app_context_;
   rex::ui::ImmediateDrawer *immediate_drawer_;

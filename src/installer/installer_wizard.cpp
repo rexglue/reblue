@@ -723,15 +723,26 @@ void InstallerWizard::DrawFooter() {
   if (ImGui::Button(T("installer.button.back"), kButton))
     page_ = Page::Content;
 
-  // Repair mode offers one more way on: an install whose discs still check out
-  // can boot without copying anything.
-  const int forward = repair_ ? 2 : 1;
+  // Repair mode offers two more ways on: an install whose discs still check
+  // out can boot without copying anything, and re-adding the Steam shortcut
+  // needs no disc pass at all.
+  // Wider than the others: "Add to Steam" clips at kButtonWidth.
+  constexpr float kSteamWidth = 160.0f;
+  float forward_width = kButtonWidth;
+  if (repair_)
+    forward_width += kGap + kButtonWidth + kGap + kSteamWidth;
   ImGui::SameLine();
   ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
-                       ImGui::GetContentRegionAvail().x -
-                       forward * kButtonWidth - (forward - 1) * kGap);
+                       ImGui::GetContentRegionAvail().x - forward_width);
 
   if (repair_) {
+    // Dimmed unless the checkbox on the first page is checked, so the button
+    // does not read as available independently of that intent.
+    ImGui::BeginDisabled(!add_steam_shortcut_);
+    if (ImGui::Button(T("installer.button.add_steam"), ImVec2(kSteamWidth, 0)))
+      AddSteamShortcutOnly();
+    ImGui::EndDisabled();
+    ImGui::SameLine(0, kGap);
     if (ImGui::Button(T("installer.button.done"), kButton))
       StartIndexRebuild();
     ImGui::SameLine(0, kGap);
@@ -928,6 +939,12 @@ void InstallerWizard::DrawDone() {
     if (ImGui::Button(T("installer.button.quit"), ImVec2(120, 0)))
       Finish(false);
   }
+}
+
+void InstallerWizard::AddSteamShortcutOnly() {
+  done_success_ = true;
+  done_message_ = AddSteamShortcut();
+  page_ = Page::Done;
 }
 
 void InstallerWizard::InitDLCCatalog() {
