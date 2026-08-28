@@ -34,6 +34,19 @@ constexpr const char *kStagingDir = ".update";
 // Written last, so an interrupted download can never look installable.
 constexpr const char *kReadyMarker = "ready";
 
+#if defined(__APPLE__)
+std::filesystem::path RunningBundle() {
+  const auto exe = rex::filesystem::GetExecutablePath();
+  // <bundle>.app/Contents/MacOS/reblue
+  const auto bundle = exe.parent_path().parent_path().parent_path();
+  if (bundle.extension() != ".app")
+    return {};
+  std::error_code ec;
+  return std::filesystem::exists(bundle / "Contents" / "MacOS", ec) ? bundle
+                                                                    : std::filesystem::path{};
+}
+#endif
+
 } // namespace
 
 Updates &Updates::Get() {
@@ -165,9 +178,9 @@ void Updates::BeginApply(const std::filesystem::path &install_root) {
 }
 
 Updates::ApplyResult Updates::Apply(const std::filesystem::path &install_root) {
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(__APPLE__)
   (void)install_root;
-  BD_INFO("Update apply is Windows only for now");
+  BD_INFO("Update apply is Windows and macOS only for now");
   return ApplyResult::kNoUpdate;
 #else
   const DownloadProgress progress = [this](u64 done, u64 total) {
@@ -189,6 +202,15 @@ Updates::ApplyResult Updates::Apply(const std::filesystem::path &install_root) {
                    ("reblue-" + manifest->app_version + ".zip");
   const auto staging = install_root / kStagingDir;
 
+#if defined(__APPLE__)
+  // Nothing to swap the download into, so this fails before spending the
+  // bandwidth rather than after.
+  if (RunningBundle().empty()) {
+    BD_ERROR("Update apply needs a bundled build, this one is not in a .app");
+    return ApplyResult::kNoUpdate;
+  }
+#endif
+
   BD_INFO("Downloading v{} ({} bytes)", manifest->app_version, artifact->size);
   switch (
       Package::Fetch(artifact->url, artifact->sha256, zip, staging, progress)) {
@@ -203,11 +225,22 @@ Updates::ApplyResult Updates::Apply(const std::filesystem::path &install_root) {
   }
 
   std::error_code ec;
+#if defined(__APPLE__)
+  // ditto writes the bundle as the archive's one top-level entry, so this is
+  // both the "did it unpack" check and the "is it the mac artifact" check.
+  if (!fs::exists(staging / "reblue.app" / "Contents" / "MacOS" / "reblue",
+                  ec)) {
+    BD_ERROR("Update archive holds no reblue.app");
+    fs::remove_all(staging, ec);
+    return ApplyResult::kUnpackFailed;
+  }
+#else
   if (!fs::exists(staging / "reblue.exe", ec)) {
     BD_ERROR("Update archive holds no reblue.exe");
     fs::remove_all(staging, ec);
     return ApplyResult::kUnpackFailed;
   }
+#endif
 
   std::ofstream ready(staging / kReadyMarker, std::ios::binary);
   ready << manifest->app_version;
@@ -386,6 +419,126 @@ void ClearReplacedFiles(const fs::path &install_root) {
     fs::remove(aside, ec);
     if (fs::exists(aside, ec))
       pending.push_back(rel);
+  }
+  WriteReplacedList(list_path, pending);
+}
+#elif defined(__APPLE__)
+namespace {
+
+namespace fs = std::filesystem;
+
+// Absolute paths, one per line: the bundle sits beside its replacement rather
+// than under the install root, so a relative list has nothing to resolve
+// against.
+constexpr const char *kReplacedBundles = ".replaced-bundles";
+constexpr const char *kReplacedSuffix = ".replaced";
+
+std::vector<std::string> ReadReplacedList(const fs::path &path) {
+  std::vector<std::string> out;
+  std::ifstream list(path, std::ios::binary);
+  std::string line;
+  while (std::getline(list, line)) {
+    if (!line.empty())
+      out.push_back(line);
+  }
+  return out;
+}
+
+void WriteReplacedList(const fs::path &path,
+                       const std::vector<std::string> &entries) {
+  std::error_code ec;
+  if (entries.empty()) {
+    fs::remove(path, ec);
+    return;
+  }
+  std::ofstream list(path, std::ios::binary);
+  for (const auto &entry : entries)
+    list << entry << "\n";
+}
+
+// The staging tree and the bundle can be on different volumes, since the
+// install root is wherever the user put the game. A rename covers the usual
+// case in one atomic step; the copy is the fallback, and copy_symlinks keeps
+// the loader alias the bundle seal records.
+bool MoveTree(const fs::path &from, const fs::path &to, std::error_code &ec) {
+  fs::rename(from, to, ec);
+  if (!ec)
+    return true;
+
+  ec.clear();
+  fs::copy(from, to,
+           fs::copy_options::recursive | fs::copy_options::copy_symlinks, ec);
+  if (ec)
+    return false;
+  std::error_code drop;
+  fs::remove_all(from, drop);
+  return true;
+}
+
+} // namespace
+
+bool InstallStagedUpdate(const fs::path &install_root) {
+  std::error_code ec;
+  const auto staging = install_root / kStagingDir;
+  if (!fs::exists(staging / kReadyMarker, ec))
+    return false;
+
+  const auto bundle = RunningBundle();
+  const auto staged = staging / "reblue.app";
+  if (bundle.empty() || !fs::exists(staged, ec)) {
+    BD_ERROR("Staged update has nothing to install into, discarding it");
+    fs::remove_all(staging, ec);
+    return false;
+  }
+
+  // Unlike Windows, macOS lets a running bundle be renamed out from under its
+  // own process: the image stays mapped by inode. So the swap is two renames
+  // of one directory each, and the whole signed tree lands or none of it does.
+  const auto aside = fs::path(bundle.native() + kReplacedSuffix);
+  fs::remove_all(aside, ec);
+  fs::rename(bundle, aside, ec);
+  if (ec) {
+    BD_ERROR("Update install could not move {} aside: {}", bundle.string(),
+             ec.message());
+    return false;
+  }
+
+  if (!MoveTree(staged, bundle, ec)) {
+    BD_ERROR("Update install could not swap in {}: {}", bundle.string(),
+             ec.message());
+    std::error_code back;
+    fs::rename(aside, bundle, back);
+    if (back)
+      BD_ERROR("...and could not put {} back: {}", bundle.string(),
+               back.message());
+    fs::remove(staging / kReadyMarker, ec);
+    return false;
+  }
+
+  auto replaced = ReadReplacedList(install_root / kReplacedBundles);
+  auto name = aside.string();
+  if (std::find(replaced.begin(), replaced.end(), name) == replaced.end())
+    replaced.push_back(std::move(name));
+  WriteReplacedList(install_root / kReplacedBundles, replaced);
+
+  fs::remove_all(staging, ec);
+  BD_INFO("Installed the staged update into {}", bundle.string());
+  return true;
+}
+
+void ClearReplacedFiles(const fs::path &install_root) {
+  const auto list_path = install_root / kReplacedBundles;
+  const auto entries = ReadReplacedList(list_path);
+  if (entries.empty())
+    return;
+
+  std::error_code ec;
+  std::vector<std::string> pending;
+  for (const auto &entry : entries) {
+    const fs::path aside(entry);
+    fs::remove_all(aside, ec);
+    if (fs::exists(aside, ec))
+      pending.push_back(entry);
   }
   WriteReplacedList(list_path, pending);
 }

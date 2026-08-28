@@ -7,10 +7,70 @@
  */
 #include "core/zip_unpack.h"
 
+#include <string>
+#include <vector>
+
+#include <rex/types.h>
+
 #define MINIZ_HEADER_FILE_ONLY
 #include <miniz.h>
 
 namespace bd {
+namespace {
+
+#if defined(__APPLE__)
+constexpr mz_uint kHostUnix = 3;
+constexpr u32 kModeTypeMask = 0xF000;
+constexpr u32 kModeSymlink = 0xA000;
+
+u32 UnixModeOf(const mz_zip_archive_file_stat &stat) {
+  if ((stat.m_version_made_by >> 8) != kHostUnix)
+    return 0;
+  return static_cast<u32>(stat.m_external_attr >> 16);
+}
+
+bool IsSymlink(u32 mode) { return (mode & kModeTypeMask) == kModeSymlink; }
+
+// A symlink entry stores its target as the entry's contents. The target is
+// checked like an entry name, so a link may not point out of the tree it is
+// extracted into either.
+bool ExtractSymlink(mz_zip_archive &zip, int index,
+                    const std::filesystem::path &out_path,
+                    const mz_zip_archive_file_stat &stat, std::string &error) {
+  if (stat.m_uncomp_size == 0 || stat.m_uncomp_size > 4096) {
+    error = "implausible symlink target size for '" +
+            std::string(stat.m_filename) + "'";
+    return false;
+  }
+
+  std::vector<char> target(static_cast<size_t>(stat.m_uncomp_size));
+  if (!mz_zip_reader_extract_to_mem(&zip, static_cast<mz_uint>(index),
+                                    target.data(), target.size(), 0)) {
+    error = "failed to read the symlink target of '" +
+            std::string(stat.m_filename) + "'";
+    return false;
+  }
+
+  const std::string link(target.data(), target.size());
+  if (IsUnsafeArchivePath(link)) {
+    error = "symlink '" + std::string(stat.m_filename) + "' points outside "
+            "the archive, at '" + link + "'";
+    return false;
+  }
+
+  std::error_code ec;
+  std::filesystem::remove(out_path, ec);
+  std::filesystem::create_symlink(link, out_path, ec);
+  if (ec) {
+    error = "failed to create the symlink '" + std::string(stat.m_filename) +
+            "': " + ec.message();
+    return false;
+  }
+  return true;
+}
+#endif // mac
+
+} // namespace
 
 bool IsUnsafeArchivePath(const std::string &path) {
   if (path.empty())
@@ -63,12 +123,45 @@ bool UnpackZip(const std::filesystem::path &zip_path,
 
     const auto out_path = dest / std::filesystem::path(name);
     std::filesystem::create_directories(out_path.parent_path(), ec);
+
+#if defined(__APPLE__)
+    mz_zip_archive_file_stat stat{};
+    if (!mz_zip_reader_file_stat(&zip, static_cast<mz_uint>(i), &stat)) {
+      error = "unreadable entry header for '" + name + "' in " +
+              zip_path.string();
+      mz_zip_reader_end(&zip);
+      return false;
+    }
+    const u32 mode = UnixModeOf(stat);
+
+    if (IsSymlink(mode)) {
+      if (!ExtractSymlink(zip, i, out_path, stat, error)) {
+        mz_zip_reader_end(&zip);
+        return false;
+      }
+      continue;
+    }
+#endif
+
     if (!mz_zip_reader_extract_to_file(&zip, i, out_path.string().c_str(),
                                        0)) {
       error = "failed to extract '" + name + "' from " + zip_path.string();
       mz_zip_reader_end(&zip);
       return false;
     }
+
+#if defined(__APPLE__)
+    if (const u32 permissions = mode & 0777; permissions != 0) {
+      std::filesystem::permissions(
+          out_path, static_cast<std::filesystem::perms>(permissions),
+          std::filesystem::perm_options::replace, ec);
+      if (ec) {
+        error = "failed to set the mode of '" + name + "': " + ec.message();
+        mz_zip_reader_end(&zip);
+        return false;
+      }
+    }
+#endif
   }
 
   mz_zip_reader_end(&zip);

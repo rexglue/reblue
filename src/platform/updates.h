@@ -77,7 +77,7 @@ public:
   // the check still runs and still logs, but nothing offers the user an
   // update it would then fail to apply.
   static constexpr bool CanApply() {
-#if defined(_WIN32)
+#if defined(_WIN32) || defined(__APPLE__)
     return true;
 #else
     return false;

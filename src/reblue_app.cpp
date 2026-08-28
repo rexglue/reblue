@@ -554,10 +554,16 @@ void ReblueApp::OnConfigurePaths(rex::PathConfig &paths) {
     else
       bd::platform::ShowWarning("re:Blue", warning);
   }
+#endif
 
+#if defined(_WIN32) || defined(__APPLE__)
   // A build-dir exe run against this install is not part of it, so swapping
   // release binaries in under it would strand the debugger on the wrong image.
-  if (program_dir == install_root_) {
+  // The mac bundle lives wherever the user dragged it, so there is no folder.
+#if defined(_WIN32)
+  if (program_dir == install_root_)
+#endif
+  {
     bd::platform::ClearReplacedFiles(install_root_);
     if (bd::platform::InstallStagedUpdate(install_root_)) {
       if (!bd::platform::RelaunchSelf(false)) {
@@ -570,7 +576,9 @@ void ReblueApp::OnConfigurePaths(rex::PathConfig &paths) {
       return;
     }
   }
+#endif
 
+#if defined(_WIN32)
   // Before any device exists: the exe that keeps the session is the one that
   // creates one.
   if (auto cfg = bd::installer::ReadInstallRegistry();
