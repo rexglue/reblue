@@ -782,7 +782,7 @@ lfe_level.label.de = "Subwoofer"
 lfe_level.label.es = "Subwoofer"
 lfe_level.label.fr = "Subwoofer"
 lfe_level.label.it = "Subwoofer"
-lfe_level.po = "Subwoofer"
+lfe_level.label.po = "Subwoofer"
 
 [settings.controls]
 pad_layout.label.us = "@game:cfg_str/CFG_S0040|Control Type"
