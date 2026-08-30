@@ -125,12 +125,18 @@ Yes. Each profile is its own folder under `profiles\`, holding that profile's sa
 
 re:Blue builds with CMake and vcpkg against the [ReXGlue SDK](https://github.com/rexglue/rexglue-sdk).
 
+As with running the game, building requires the files from your own copy of Blue Dragon.
+First, extract the game files using a pre-made build, or any other means you have available, and place the `default.xex` file in `./assets/`.
+
 ```sh
-cmake --preset win-amd64-release       # or linux-amd64-release
-cmake --build --preset win-amd64-release
+export PRESET=win-amd64-release  # or linux-amd64-release
+
+cmake --preset "${PRESET}"
+cmake --build --preset "${PRESET}" --target reblue_codegen
+cmake --build --preset "${PRESET}"
 ```
 
-Presets cover `win-amd64`, `win-vk`, `linux-amd64`, `linux-arm64`, `mac-amd64`, and `mac-arm64`, each in Debug, Release, and RelWithDebInfo. A `win-amd64` preset builds both the DX12 executable (`reblue.exe`) and the Vulkan one (`reblue_vk.exe`), and a `win-vk` one builds the Vulkan executable alone. As with running the game, building requires the files from your own copy of Blue Dragon.
+Presets cover `win-amd64`, `win-vk`, `linux-amd64`, `linux-arm64`, `mac-amd64`, and `mac-arm64`, each in Debug, Release, and RelWithDebInfo. A `win-amd64` preset builds both the DX12 executable (`reblue.exe`) and the Vulkan one (`reblue_vk.exe`), and a `win-vk` one builds the Vulkan executable alone.
 
 ## Credits
 
