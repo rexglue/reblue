@@ -176,16 +176,13 @@ constexpr SettingOption kHudMode[] = {
     {.text = "On", .num = 0, .key = "opt.on"},
     {.text = "Auto-Hide", .num = 1, .key = "opt.auto_hide"},
     {.text = "Off", .num = 2, .key = "opt.off"}};
-// AA path. MSAA multisamples at output resolution. SSAA renders above output
-// resolution and downsamples (num != 0 selects the SSAA path).
-constexpr SettingOption kAAMode[] = {{.text = "MSAA", .num = 0},
-                              {.text = "SSAA", .num = 1}};
-// AA multiplier for the active path. Levels above what the path accepts are
-// shown grayed-out, and the cap comes from gpu::Settings::MaxAALevel.
-constexpr SettingOption kAALevel[] = {{.text = "Off", .num = 1, .key = "opt.off"},
-                               {.text = "2x", .num = 2},
-                               {.text = "4x", .num = 4},
-                               {.text = "8x", .num = 8}};
+constexpr SettingOption kMSAA[] = {{.text = "Off", .num = 0, .key = "opt.off"},
+                                   {.text = "2x", .num = 2},
+                                   {.text = "4x", .num = 4},
+                                   {.text = "8x", .num = 8}};
+constexpr SettingOption kSuperSampling[] = {
+    {.text = "Off", .num = 1, .key = "opt.off"},
+    {.text = "On", .num = 2, .key = "opt.on"}};
 // bd_anisotropy keeps its 0..16 range for anyone who wants a middle step, but
 // the menus offer the two ends of it.
 constexpr i32 kAnisotropyOn = 16;
@@ -589,40 +586,35 @@ constexpr SettingRow kGraphicsSettings[] = {
                   gpu::Settings::Get().QualityPreset() !=
                       gpu::QualityPreset::Custom;
          }},
-    {.label = "settings.graphics.anti_aliasing.label",
+    {.label = "settings.graphics.msaa.label",
+     .group = "menu.header.anti_aliasing",
+     .binding = {.get =
+                     [] {
+                       return static_cast<double>(gpu::Settings::Get().MSAA());
+                     },
+                 .set =
+                     [](double v) {
+                       return gpu::Settings::Get().SetMSAA(
+                           static_cast<i32>(v));
+                     }},
+     .options = kMSAA,
+     .count = OptCount(kMSAA),
+     .restart = true},
+    {.label = "settings.graphics.supersampling.label",
      .group = "menu.header.anti_aliasing",
      .binding = {.get =
                      [] {
                        return static_cast<double>(
-                           static_cast<u32>(gpu::Settings::Get().AAMode()));
+                           gpu::Settings::Get().SuperSampling());
                      },
                  .set =
                      [](double v) {
-                       return gpu::Settings::Get().SetAAMode(
-                           static_cast<gpu::AAMode>(static_cast<u32>(v)));
+                       return gpu::Settings::Get().SetSuperSampling(
+                           static_cast<i32>(v));
                      }},
-     .options = kAAMode,
-     .count = OptCount(kAAMode),
+     .options = kSuperSampling,
+     .count = OptCount(kSuperSampling),
      .restart = true},
-    {.label = "settings.graphics.aa_level.label",
-     .group = "menu.header.anti_aliasing",
-     .binding = {
-         .get =
-             [] { return static_cast<double>(gpu::Settings::Get().AALevel()); },
-         .set =
-             [](double v) {
-               return gpu::Settings::Get().SetAALevel(static_cast<i32>(v));
-             }},
-     .options = kAALevel,
-     .count = OptCount(kAALevel),
-     .restart = true,
-     // The cap belongs to gpu::Settings, so a level the object would refuse is
-     // the same level the row grays out.
-     .optionDisabled =
-         [](const SettingOption &o) {
-           return o.num >
-                  gpu::Settings::MaxAALevel(gpu::Settings::Get().AAMode());
-         }},
     {.label = "settings.graphics.anisotropic.label",
      .group = "menu.header.detail",
      .binding = {.get =
@@ -809,7 +801,6 @@ constexpr SettingRow kControlsSettings[] = {
      .action = SettingAction::Keybinds},
 };
 
-
 // The keybind screen draws this list as a 2-column grid, row-major, so the
 // order interleaves its sections column-wise: even indices walk the Actions
 // column, odd indices the Movement & Camera column. The tail is the Controller
@@ -926,7 +917,6 @@ constexpr SettingRow kKeybindSettings[] = {
     // keybind_guide is deliberately absent: the guest has no Guide button
     // handler, so a row for it would always read 'None'.
 };
-
 
 // Order matches SettingsPage, which is also sidebar order.
 constexpr SettingsPageTable kPages[kSettingsPageCount] = {

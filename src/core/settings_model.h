@@ -107,8 +107,6 @@ int SettingsOptionCount(SettingsPage page, int index);
 const char *SettingsOptionText(SettingsPage page, int index, int option);
 int SettingsSelectedOption(SettingsPage page, int index);
 
-// True when a single option is grayed-out and cannot be selected while the
-// row itself stays active (e.g. 8x AA level while SSAA is on).
 bool SettingsOptionDisabled(SettingsPage page, int index, int option);
 
 // Slider rows (Slider / SliderSteps): current value as a 0..1 fraction for

@@ -549,9 +549,9 @@ void InstallerWizard::DrawOptions() {
   if (BeginRows("##graphics_rows")) {
     DrawSettingRow(SettingsPage::Graphics,
                    "settings.graphics.quality_preset.label");
+    DrawSettingRow(SettingsPage::Graphics, "settings.graphics.msaa.label");
     DrawSettingRow(SettingsPage::Graphics,
-                   "settings.graphics.anti_aliasing.label");
-    DrawSettingRow(SettingsPage::Graphics, "settings.graphics.aa_level.label");
+                   "settings.graphics.supersampling.label");
     ImGui::EndTable();
   }
 

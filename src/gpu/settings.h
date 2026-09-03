@@ -1,7 +1,6 @@
 /**
  * @file    gpu/settings.h
- * @brief   Graphics settings. The AA path and the quality presets are policy
- *          over several settings at once, so they live here, not in the menu.
+ * @brief   Graphics settings.
  * @license BSD 3-Clause, see LICENSE
  */
 #pragma once
@@ -9,14 +8,6 @@
 #include <rex/types.h>
 
 namespace bd::gpu {
-
-// Which anti-aliasing path the scene takes. One multiplier, two paths:
-// supersampling renders above output resolution and downsamples, multisampling
-// samples at output resolution.
-enum class AAMode : u32 {
-  MultiSample = 0,
-  SuperSample = 1,
-};
 
 // The ratio BD's render target is fit to inside the window. Every mode but
 // Original reprojects the scene to hold the vertical view while the 2D layer
@@ -99,11 +90,6 @@ public:
   f64 ShadowDistance() const { return shadowDistance_; }
   bool SetShadowDistance(f64 v);
 
-  // How far above the size BD asks for the planar reflection may be scaled.
-  // The game's own distance LOD still picks that size. This only bounds how
-  // far the render rect and supersampling are allowed to lift it.
-  f64 ReflectionUpscale() const { return reflectionUpscale_; }
-
   // Coverage and map dimension are one setting between them: coverage is live
   // and the dimension restart-bound, but a step that moved only one would
   // leave texel density wrong for as long as the coverage change is visible.
@@ -143,23 +129,10 @@ public:
   i32 SurfacePoolBudgetPercent() const { return surfacePoolBudgetPercent_; }
   bool SetSurfacePoolBudgetPercent(i32 v);
 
-  // The AA path and its multiplier, as the user asked for them. Clamping to
-  // what the device actually supports stays with the device, the only place
-  // that knows.
-  gpu::AAMode AAMode() const;
-  i32 AALevel() const;
   i32 SuperSampling() const { return superSampling_; }
+  bool SetSuperSampling(i32 v);
   i32 MSAA() const { return msaa_; }
-
-  // Both are restart-bound, and both write the pair, because the two settings
-  // encode one setting between them.
-  bool SetAAMode(gpu::AAMode mode);
-  bool SetAALevel(i32 level);
-
-  // The highest level the path accepts. A menu that grays out levels asks for
-  // this rather than repeating the cap, so it cannot disagree with what
-  // SetAALevel will actually take.
-  static i32 MaxAALevel(gpu::AAMode mode);
+  bool SetMSAA(i32 v);
 
   // The preset the five quality settings currently match, or Custom.
   gpu::QualityPreset QualityPreset() const;
@@ -177,7 +150,6 @@ private:
   void AdoptNTSCFilter();
   void AdoptDOFStrength();
   void AdoptShadowDistance();
-  void AdoptReflectionUpscale();
   void AdoptVsync();
   void AdoptDiagVerbosity();
   void AdoptAspectRatio();
@@ -190,8 +162,6 @@ private:
   void AdoptSuperSampling();
   void AdoptMSAA();
 
-  bool SetAAPair(i32 superSampling, i32 msaa);
-
   i32 anisotropy_ = 16;
   i32 superSampling_ = 1;
   i32 msaa_ = 4;
@@ -199,7 +169,6 @@ private:
   f64 dofStrength_ = 1.0;
   i32 shadowDimension_ = 4096;
   f64 shadowDistance_ = 2.0;
-  f64 reflectionUpscale_ = 2.0;
   i32 aspectRatio_ = static_cast<i32>(AspectMode::Auto);
   i32 fovOffset_ = 0;
   bool vsync_ = true;

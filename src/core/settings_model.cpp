@@ -476,9 +476,6 @@ bool WriteValue(const SettingRow &s, const SettingOption &o) {
   return true;
 }
 
-// Cycling steps over a grayed-out option instead of stopping on it: 'Custom'
-// is a state the preset row reports rather than a target, and 8x is out of
-// reach of the supersampling path.
 int NextEnabledOption(const SettingRow &s, int cur, int dir) {
   const RowOpts o = OptsOf(s);
   int next = cur;
