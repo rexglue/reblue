@@ -24,6 +24,7 @@
 #include "gpu/d3d.h"
 #include "gpu/device.h"
 #include "gpu/settings.h"
+#include "gpu/hooks/tweaks.h"
 
 // screenW/H on VisualRender is BD's master dim: the scene RT base, the
 // post/bloom pyramid, the composite and the 2D basis all derive from it. The
@@ -153,16 +154,13 @@ void bdProjectionAspectHook(PPCRegister &fov_half, PPCRegister &aspect) {
 // stay authored. Dims above the canvas are already output-space and pass
 // through, which also keeps a re-fed scaled size from compounding. Uniform,
 // height-based since bd_aspect_ratio widens only the width.
-// Divided by the supersampling factor, since Visual__UnitNormal__vf03 sizes
-// the scene surfaces from this view texture and multiplies by it again.
 void bdOutputResViewScaleHook(PPCRegister &f1, PPCRegister &f2) {
   u32 w, h;
   if (!Output::LatchedFit(w, h))
     return;
   if (f1.f64 > kDesignCanvasWidth || f2.f64 > kDesignCanvasHeight)
     return;
-  const double ss = std::max(bd::gpu::Video::BootSupersampling(), 1);
-  const double s = h / static_cast<double>(kDesignCanvasHeight) / ss;
+  const double s = h / static_cast<double>(kDesignCanvasHeight);
   if (s > 1.0) {
     f1.f64 *= s;
     f2.f64 *= s;
@@ -177,7 +175,8 @@ void bdOutputResViewScaleHook(PPCRegister &f1, PPCRegister &f2) {
 // be the distortion rather than the cure.
 void bdViewProjectionAspectHook(PPCRegister &r31, PPCRegister &fov_half,
                                 PPCRegister &aspect) {
-  if (bd::mem::load<float>(r31.u32 + kCloseUpViewWidthOff) < kDesignCanvasWidth)
+  if (bd::mem::load<float>(r31.u32 + kCloseUpViewWidthOff) <
+      kDesignCanvasWidth * bd::gpu::SceneRenderScale())
     return;
   bdProjectionAspectHook(fov_half, aspect);
 }

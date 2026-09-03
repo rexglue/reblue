@@ -161,9 +161,6 @@ public:
   // unsupported. Boot-latched, so runtime writes apply on the next reboot.
   static plume::RenderSampleCounts CvarMSAASampleCount();
 
-  // bd_supersampling latched at first use (AA is restart-bound). 1 = MSAA path.
-  static i32 BootSupersampling();
-
   // Shared by every pipeline so descriptor set bindings survive pipeline
   // switches.
   static plume::RenderPipelineLayout *MainPipelineLayout();
@@ -447,8 +444,6 @@ struct VideoState {
   // into.
   GuestTexture *last_drawn_ds[kNumFrames] = {};
 
-  // Aligns with the 1280 scene resolve at the DOF blur downsample, where
-  // last_drawn_ds (supersampled main pass depth) does not.
   GuestTexture *scene_depth = nullptr;
 
   // Most recent D3DDevice_Resolve destination (the engine's final scanned-out

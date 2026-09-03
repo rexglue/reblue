@@ -11,7 +11,6 @@
  */
 #include "gpu/hooks/tweaks.h"
 
-#include <algorithm>
 #include <cmath>
 #include <unordered_map>
 
@@ -25,8 +24,15 @@
 #include "engine/engine.h"
 #include "gpu/d3d.h"
 #include "gpu/device.h"
+#include "gpu/host_resource_heap.h"
 #include "gpu/output.h"
 #include "gpu/settings.h"
+
+namespace {
+constexpr u32 kVisualRenderEA = 0x82DC9848;
+constexpr u32 kVisualRenderRateOff = 0x1BC4;
+constexpr u32 kScreenUVScaleReg = 50;
+} // namespace
 
 namespace bd::gpu {
 
@@ -37,40 +43,26 @@ f64 ShadowCoverageScale() {
                                          : Settings::Get().ShadowDistance();
 }
 
+f32 SceneRenderScale() {
+  const u32 render = bd::mem::try_load<u32>(kVisualRenderEA);
+  const f32 rate = bd::mem::try_field<f32>(render, kVisualRenderRateOff, 1.0f);
+  return rate > 0.0f ? rate : 1.0f;
+}
+
 } // namespace bd::gpu
 
-// BD halves the scene when FSAA is on to fit EDRAM, but reblue has no such
-// limit, so zero the flag. That path also skips BD's g_defaultMultisample=1,
-// which CreateSurface needs to apply MSAA to scene color and depth.
-void bdSceneForceFullResHook(PPCRegister &r11) {
-  const bool fsaa_was_on = (r11.u32 != 0);
-  r11.u32 = 0;
-  if (fsaa_was_on && bd::gpu::Video::CvarMSAASampleCount() !=
-                         plume::RenderSampleCount::COUNT_1) {
-    bd::mem::store<u32>(0x82DDA680, 1u); // g_defaultMultisample
-  }
+void bdSceneFSAASeedHook(PPCRegister &r11) {
+  r11.u32 = bd::gpu::Settings::Get().MSAA() > 0 ? 1u : 0u;
 }
 
-// Registered at both the scene color and depth creates so the pair stays
-// matched. The engine resolves the scaled scene down to the output target.
-void bdSceneResolutionScaleHook(PPCRegister &r3, PPCRegister &r4) {
-  const i32 f = bd::gpu::Video::BootSupersampling();
-  if (f <= 1)
-    return;
-  r3.u32 *= static_cast<u32>(f);
-  r4.u32 *= static_cast<u32>(f);
+bool bdSceneTilingSuppressHook() { return true; }
+
+void bdSceneRenderScaleHook(PPCRegister &r31) {
+  bd::mem::try_store<f32>(
+      r31.u32 + kVisualRenderRateOff,
+      static_cast<f32>(bd::gpu::Settings::Get().SuperSampling()));
 }
 
-// BD sizes the planar reflection off a hardcoded 320-wide base against the
-// canvas, and recreates the sampleable resolve texture only when the game-set
-// scale changes, so scaling the stored dims alone leaves the resolve writing
-// a stock-sized texture forever. Scale the width by the render rect times
-// supersampling, bounded by bd_reflection_upscale so the game's own distance
-// LOD keeps picking the size instead of every plane landing on the cap, and
-// capped just under FullscreenChainClassLocked's width gate so it can never
-// take fullscreen_chain_head. Break the scale latch whenever the forced width
-// changes so the guest recreates the texture. The height and the create both
-// derive from the stored width downstream of the hook site.
 void bdReflectionResolutionScaleHook(PPCRegister &r31) {
   u32 render_w = 0;
   u32 render_h = 0;
@@ -80,14 +72,9 @@ void bdReflectionResolutionScaleHook(PPCRegister &r31) {
   if (!info)
     return;
 
-  const u32 ss =
-      static_cast<u32>(std::max(bd::gpu::Video::BootSupersampling(), 1));
-  const double sx = std::min(
-      render_w * ss / static_cast<double>(bd::gpu::kDesignCanvasWidth),
-      bd::gpu::Settings::Get().ReflectionUpscale());
-  const double cap = std::min(render_w, 1280u) - 8.0;
+  const double sx = render_w / static_cast<double>(bd::gpu::kDesignCanvasWidth);
   const u32 stock = static_cast<u32>(info->width);
-  const u32 width = static_cast<u32>(std::min(stock * sx, cap) + 0.5);
+  const u32 width = static_cast<u32>(stock * sx + 0.5);
   if (width > stock)
     info->width = width;
 
@@ -97,6 +84,13 @@ void bdReflectionResolutionScaleHook(PPCRegister &r31) {
     last = info->width;
     info->lastScale = -1.0f;
   }
+}
+
+void bdReflectionSurfaceTagHook(PPCRegister &r3) {
+  auto *surface =
+      bd::gpu::HostResourceHeap::FromGuest<bd::gpu::GuestTexture>(r3.u32);
+  if (surface)
+    surface->reflection = true;
 }
 
 // The light frustum is world-space and receivers sample by UV, so a larger map
@@ -152,12 +146,6 @@ void bdWaterSpecIntensityClampHook(PPCRegister &r3) {
     *w = static_cast<float>(ceiling);
   }
 }
-
-// VS/PS float constant for screen-space -> UV reconstruction: .xy is the
-// NDC->UV half-scale (0.5), .w the distortion strength.
-namespace {
-constexpr u32 kScreenUVScaleReg = 50;
-} // namespace
 
 // The NDC->UV half-scale is always 0.5, but the guest derives it as
 // sceneRT.dim/1280x720*0.5, so every resolution setting leaks into screen-space

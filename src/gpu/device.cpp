@@ -13,7 +13,6 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
-#include <cmath>
 #include <format>
 #include <memory>
 #include <mutex>
@@ -115,17 +114,7 @@ bool BuildPresentSemaphores(VideoState &s) {
   return true;
 }
 
-i32 Video::BootSupersampling() {
-  // AA is restart-bound: precache twins are enqueued at boot for one sample
-  // state, so a live switch would stall on render thread PSO compiles.
-  static const i32 v = Settings::Get().SuperSampling();
-  return v;
-}
-
 plume::RenderSampleCounts Video::CvarMSAASampleCount() {
-  // Mutually exclusive: an active super-sampling factor forces MSAA off.
-  if (BootSupersampling() > 1)
-    return plume::RenderSampleCount::COUNT_1;
   static const i32 boot_msaa = Settings::Get().MSAA();
   auto &s = state();
   plume::RenderSampleCounts requested;

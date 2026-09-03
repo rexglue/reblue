@@ -1,101 +1,88 @@
-# Render tweaks layered over BD's native pipeline (bodies in src/gpu/hooks/tweaks.cpp).
-
-# Internal resolution scaling (bd_supersampling).
-# Force BD's full-resolution scene path (zero the FSAA flag it just loaded).
 [[midasm_hook]]
-address = 0x82186C0C
-name = "bdSceneForceFullResHook"
+address = 0x821335A4
+name = "bdSceneFSAASeedHook"
 registers = ["r11"]
 after_instruction = true
 
-# Scale the scene COLOR surface dims (bl hcgD3DCreateSurface; r3=Width r4=Height).
 [[midasm_hook]]
-address = 0x82186CDC
-name = "bdSceneResolutionScaleHook"
-registers = ["r3", "r4"]
+address = 0x82186C40
+name = "bdSceneTilingSuppressHook"
+registers = []
 after_instruction = false
+jump_address_on_true = 0x82186C54
 
-# Scale the scene DEPTH surface dims (bl hcgD3DCreateSurfaceEx; r3=Width r4=Height).
 [[midasm_hook]]
-address = 0x82186D34
-name = "bdSceneResolutionScaleHook"
-registers = ["r3", "r4"]
-after_instruction = false
+address = 0x8213307C
+name = "bdSceneRenderScaleHook"
+registers = ["r31"]
+after_instruction = true
 
-# Planar reflection resolution, in bdPlaneReflectUpdateTexture at the clamp
-# join (lwz r11, 0xA8(r31); r31 = PlaneReflectInfo), where the stock width is
-# stored but the lastScale load feeding the recreate guard has not run yet, so
-# the hook can both scale the width and break the latch. The height calc, the
-# recreate, and Visual__UnitReflect__vf05's resolve rect all read the stored
-# width back downstream. Recomputed per call, so it cannot compound.
 [[midasm_hook]]
 address = 0x82178670
 name = "bdReflectionResolutionScaleHook"
 registers = ["r31"]
 after_instruction = false
 
-# Sun shadow map resolution (bd_shadow_dimension). Force the square dimension at
-# BOTH dimension sources so the render surface and its sampleable copy stay one
-# size; r3=Width r4=Height.
-#   Render DEPTH surface: Visual__UnitShadow__vf03, bl hcgD3DCreateSurfaceEx.
+[[midasm_hook]]
+address = 0x821876A4
+name = "bdReflectionSurfaceTagHook"
+registers = ["r3"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x821876E0
+name = "bdReflectionSurfaceTagHook"
+registers = ["r3"]
+after_instruction = true
+
+[[midasm_hook]]
+address = 0x821786D0
+name = "bdReflectionSurfaceTagHook"
+registers = ["r3"]
+after_instruction = true
+
 [[midasm_hook]]
 address = 0x821871E4
 name = "bdShadowResolutionScaleHook"
 registers = ["r3", "r4"]
 after_instruction = false
 
-#   Sampleable copy (g_shadowMapSampleableTex): Visual__ShadowMapInfo__vf08 first
-#   D3DDevice_CreateTexture; the 256x256 secondary create at 0x821751C4 stays unhooked.
 [[midasm_hook]]
 address = 0x8217517C
 name = "bdShadowResolutionScaleHook"
 registers = ["r3", "r4"]
 after_instruction = false
 
-# Sun shadow draw distance (bd_shadow_distance): scale f1 (lateral coverage) at the
-# shared vf11 ortho bctrl in Visual__ShadowMapInfo__vf10 (both frustum modes
-# converge here).
 [[midasm_hook]]
 address = 0x82175974
 name = "bdShadowCoverageScaleHook"
 registers = ["f1"]
 after_instruction = false
 
-# Pin PS reg50.xy (screen-space->UV half-scale) to its resolution-independent 0.5.
-# 0x82142FAC: both bdCameraRender reg50 stores done, r11 = g_pD3DDevice.
 [[midasm_hook]]
 address = 0x82142FAC
 name = "bdCameraRefractionUvScaleHook"
 registers = ["r11"]
 after_instruction = false
 
-# Second reg50 writer: bdCameraRenderMotionBlur (VS store 0x8213cfe8, PS 0x8213d018;
-# the live writer in cutscenes). 0x8213d034 = both stores done, r11 = g_pD3DDevice;
-# the guest's own reg50 dirty stores (0x8213d00c VS / 0x8213d03c PS) bracket this site.
 [[midasm_hook]]
 address = 0x8213d034
 name = "bdCameraRefractionUvScaleHook"
 registers = ["r11"]
 after_instruction = false
 
-# Scale the motion blur fullscreen quad verts to +/-0.98 just before bl bdDrawPrimitive;
-# r5 = the 4-vertex buffer (flt_82DEC780).
 [[midasm_hook]]
 address = 0x8213d18c
 name = "bdMotionBlurQuadInsetHook"
 registers = ["r5"]
 after_instruction = false
 
-# Depth-of-field intensity (bd_dof_strength): scale the composite blur scale c27.y
-# in place after mcl__dof_filter__vf00 stores it; r11 = the DOF constant buffer base.
 [[midasm_hook]]
 address = 0x82217224
 name = "bdDOFStrengthScaleHook"
 registers = ["r11"]
 after_instruction = true
 
-# Clamp water c51.w (g_vWaveParams1.w) at each mcl_water_object_vf08 constant flush;
-# r3 = flush descriptor, hook acts only on the PS flush covering c51.
 [[midasm_hook]]
 address = 0x824547B0
 name = "bdWaterSpecIntensityClampHook"
@@ -108,31 +95,18 @@ name = "bdWaterSpecIntensityClampHook"
 registers = ["r3"]
 after_instruction = false
 
-# Mark VS constants dirty before each fur shell draw (bl bdSceneNodeDrawIndexed in
-# bdSceneNodeDrawFurShells's shell loop).
 [[midasm_hook]]
 address = 0x8227FBD4
 name = "bdFurShellConstantsDirtyHook"
 registers = []
 after_instruction = false
 
-# bdPrimBegin drop telemetry: fires at bdPrimBegin's silent reject block; f31 = the
-# prim's z.
 [[midasm_hook]]
 address = 0x82146478
 name = "bdPrimBeginDropWarnHook"
 registers = ["f31"]
 after_instruction = false
 
-# mcl::ntsc_filter::vf01 noise roll (analog-TV scanline jitter). It writes
-# rand()*(1/65536) into bd_pe_ps_ntsc's c27.w, which the shader uses twice: as
-# the scanline wave's phase and as its amplitude. The roll fires with
-# probability 1/max(interval,1.0), and interval sits at the ctor default 1.0
-# whenever no db_posteffect record configures it, so the offset changes every
-# frame and the 4-tap blur smears by up to half the screen height. Take the else
-# path, which stores 0.0 into that slot - zero phase and zero amplitude, leaving
-# a plain 4-tap blur - and leaves the dimension and strength writes intact.
-# Gated by bd_ntsc_filter, off by default.
 [[midasm_hook]]
 address = 0x8221914C
 name = "bdNtscFilterNoiseDisableHook"

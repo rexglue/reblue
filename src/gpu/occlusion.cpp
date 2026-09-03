@@ -17,6 +17,7 @@
 #include "core/logging.h"
 #include "gpu/frame_stats.h"
 #include "gpu/gpu_timing.h"
+#include "gpu/hooks/tweaks.h"
 #include "gpu/occlusion.h"
 #include "gpu/settings.h"
 
@@ -86,33 +87,20 @@ void Occlusion::Begin() {
     if (void *mapped = s.occlusion_readback[slot]->map()) {
       const u32 count = *static_cast<const u32 *>(mapped);
       s.occlusion_readback[slot]->unmap();
-      // The count is one atomic per depth-passing fragment of the 128x128 sun
-      // test quad, so fully visible == 16384 at one sample per pixel. Under AA
-      // that basis inflates: MSAA runs the counter per sample and SSAA
-      // rasterizes the quad into ss^2 more pixels (the two paths are mutually
-      // exclusive, CvarMSAASampleCount). Left unnormalized the raw count
-      // exceeds 16384, clamps to fully visible, and the guest's count/16384
-      // flare ratio pins the sun lens flare wide open so it renders through
-      // occluding geometry (glowing star on the bg01 stairs). Renormalize to
-      // the single-sample basis the guest divisor assumes.
-      u32 oversample = 1u;
-      if (const i32 ss = Video::BootSupersampling(); ss > 1) {
-        oversample = static_cast<u32>(ss) * static_cast<u32>(ss);
-      } else {
-        switch (Video::CvarMSAASampleCount()) {
-        case plume::RenderSampleCount::COUNT_2:
-          oversample = 2u;
-          break;
-        case plume::RenderSampleCount::COUNT_4:
-          oversample = 4u;
-          break;
-        case plume::RenderSampleCount::COUNT_8:
-          oversample = 8u;
-          break;
-        default:
-          oversample = 1u;
-          break;
-        }
+      const f32 ss = SceneRenderScale();
+      u32 oversample = static_cast<u32>(ss * ss + 0.5f);
+      switch (Video::CvarMSAASampleCount()) {
+      case plume::RenderSampleCount::COUNT_2:
+        oversample *= 2u;
+        break;
+      case plume::RenderSampleCount::COUNT_4:
+        oversample *= 4u;
+        break;
+      case plume::RenderSampleCount::COUNT_8:
+        oversample *= 8u;
+        break;
+      default:
+        break;
       }
       const u32 normalized = oversample > 1u ? count / oversample : count;
       s.occlusion_last_count = normalized > 16384u ? 16384u : normalized;

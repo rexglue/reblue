@@ -13,9 +13,6 @@ float4 main(in float4 position : SV_Position, in float2 texCoord : TEXCOORD) : S
         g_Texture2DMSDescriptorHeap[g_PushConstants.ResourceDescriptorIndex];
     uint w, h, samples;
     tex.GetDimensions(w, h, samples);
-    // Map this destination pixel to the (smaller) MS source texel, then
-    // average that texel's N samples. Point-stretch, and the present-time FSR
-    // pass does the high-quality upscale.
     int2 coord = min(int2(texCoord * float2(w, h)), int2(w - 1, h - 1));
     float4 result = tex.Load(coord, 0);
     [unroll] for (int i = 1; i < SAMPLE_COUNT; i++)
