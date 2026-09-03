@@ -27,12 +27,11 @@ REX_IMPORT(__imp__CommandSelectTask_SetSelection, CmdSelectSetSelection,
            u32(u32, u32, u32));
 REX_IMPORT(__imp__AnimeMenu_GetScrollPageCount, MenuScrollPageCount, u32(u32));
 REX_EXTERN(__imp__AnimeMenu_Update);
-REX_EXTERN(__imp__CommandSelectTask__vf02);
+REX_EXTERN(__imp__CommandSelectTask__Update);
 
 namespace bd::engine {
 
 namespace {
-
 
 // AnimeMenu_setSelectedIndex's scrollMode: pulls the index into the visible
 // window, the behavior hover wants.
@@ -85,7 +84,6 @@ bool ReadList(u32 va, bool commandSelect, ListState &out) {
 }
 
 } // namespace
-
 
 MenuMouse &MenuMouse::Get() {
   static MenuMouse s;
@@ -508,13 +506,8 @@ REX_HOOK_RAW(AnimeMenu_Update) {
   bd::engine::MenuMouse::Get().Observe(menuVA);
 }
 
-// The same tick for the other widget: vf02 is what calls
-// CommandSelectTask_BuildInputBitmask and _CursorMoveUpdate, so every list the
-// pad can move passes through here. One hook covers the three battle command
-// lists, the yes/no popup, and the gimmick and event selects, since they are
-// all the same task type.
-REX_HOOK_RAW(CommandSelectTask__vf02) {
+REX_HOOK_RAW(CommandSelectTask__Update) {
   const u32 taskVA = ctx.r3.u32;
-  __imp__CommandSelectTask__vf02(ctx, base);
+  __imp__CommandSelectTask__Update(ctx, base);
   bd::engine::MenuMouse::Get().ObserveCommandSelect(taskVA);
 }

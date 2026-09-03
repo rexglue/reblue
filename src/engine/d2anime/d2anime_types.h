@@ -212,6 +212,14 @@ static_assert(offsetof(AnimeMenu_t, enableColor) == 0x164);
 static_assert(offsetof(AnimeMenu_t, needsRebuild) == 0x16C);
 static_assert(offsetof(AnimeMenu_t, shoulderPageJump) == 0x170);
 
+struct AnimeData_t {
+  /* 0x000 */ u8 _pad000[0xC0];
+  /* 0x0C0 */ mem::GuestVec<u32> varTracks;
+  /* 0x0CC */ u8 _pad0CC[0x138 - 0xCC];
+};
+static_assert(offsetof(AnimeData_t, varTracks) == 0xC0);
+static_assert(sizeof(AnimeData_t) == 0x138);
+
 struct D2AnimeTask_t {
   /* 0x000 */ u8 _pad000[0x58];
   /* 0x058 */ be_u32 flags;
@@ -222,12 +230,7 @@ struct D2AnimeTask_t {
   /* 0x06C */ be_u32 autoPlay;      // init=1, propagated to child menu +0xD8
   /* 0x070 */ be_u32 loadState;     // kLoadState*, 1..3 while still loading
   // AnimeData subobject, with its own vtable, and where AnimeVarBag lives.
-  /* 0x074 */ u8 animeData[0x138];
-  // AnimeData clock. The frame advances by animSpeed while animState is
-  // playing, and only reaches finished, the one thing that makes
-  // D2AnimeTask::vf02 write kLoadStateFinished, when animLength is not -1.
-  // A CSV the parser gives no end to therefore never reports finished,
-  // however long it is left running.
+  /* 0x074 */ AnimeData_t animeData;
   /* 0x1AC */ be_f32 animLength; // -1 = endless
   /* 0x1B0 */ be_u32 animState;  // 6 playing, 7 finished
   /* 0x1B4 */ u8 _pad1B4[0x10];

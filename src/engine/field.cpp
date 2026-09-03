@@ -239,21 +239,13 @@ Vec3 Field::Rotation() const {
 // initialized on the first non-zero answer from slot 1 and never calls it
 // again, so the non-zero return is one edge per session, taken by a continue
 // and by a new game alike.
-REX_EXTERN(__imp__ScriptManTask__vf01_Init);
-REX_HOOK_RAW(ScriptManTask__vf01_Init) {
-  __imp__ScriptManTask__vf01_Init(ctx, base);
+REX_EXTERN(__imp__ScriptManTask__Init);
+REX_HOOK_RAW(ScriptManTask__Init) {
+  __imp__ScriptManTask__Init(ctx, base);
   if (ctx.r3.u32)
     bd::engine::Events::Publish(bd::engine::SaveLoaded{});
 }
 
-// Script::vf01, slot 1 of ??_7Script@@6B@. One Script task is built per stage,
-// by the initial game start, by the script map change opcode and by a camp warp
-// alike, and the same latch makes its non-zero return one edge per stage.
-//
-// The stage is read off the task being initialized rather than off the field,
-// because the field still points at the outgoing Script when the incoming one
-// finishes: the new task is appended to the tail of that chain and only reaches
-// the head once its predecessor dies.
 REX_EXTERN(__imp__bdFieldAreaLoadStep);
 REX_HOOK_RAW(bdFieldAreaLoadStep) {
   const u32 script = ctx.r3.u32;

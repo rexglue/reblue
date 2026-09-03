@@ -18,7 +18,6 @@
 
 namespace bd::engine {
 
-// The panel a list is drawn inside, allocated by CommandSelectTask::vf05.
 struct CmdSelectWindow_t {
   /* 0x00 */ be_f32 x;
   /* 0x04 */ be_f32 y;
@@ -70,7 +69,7 @@ struct CommandSelectTask_t {
   /* 0x06C */ be_u32 window; // CmdSelectWindow_t*
   /* 0x070 */ be_u32 item;   // CmdSelectItem_t*, null on a divided list
   /* 0x074 */ be_u32 stride; // CmdSelectStride_t*, null on a divided list
-  /* 0x078 */ be_u32 font;   // font size and colors, from vf07
+  /* 0x078 */ be_u32 font;
   /* 0x07C */ be_u32 layerFront; // this list is the front one of its stack
   /* 0x080 */ u8 _pad080[0x08];
   // Shared with every sibling list, so the three battle lists carry one
@@ -147,6 +146,5 @@ int CmdSelectRowEdgeDirection(const CommandSelectTask_t &task);
 // One row in entry indices: the page's width when it numbers across, one when
 // it numbers down.
 int CmdSelectRowStep(const CommandSelectTask_t &task);
-
 
 } // namespace bd::engine

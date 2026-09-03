@@ -43,6 +43,7 @@ inline constexpr u32 kShadowLightView = 0x82DD6144;
 inline constexpr u32 kRenderView = 0x82DE87E0;
 inline constexpr u32 kCubeShadowLightView = 0x82776DA8;
 inline constexpr u32 kCameraRenderVO = 0x82DBA92C;
+inline constexpr u32 kCameraViewList = 0x82DC9854;
 } // namespace addr
 
 // GameTask, FieldPlayerEntity and the character list nodes they head are

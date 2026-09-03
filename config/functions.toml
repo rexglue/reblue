@@ -1,12 +1,20 @@
 [functions]
-0x822B8DF0 = { name = "Player__Update_vf03" }
+0x822B8DF0 = { name = "Chara__Update" }
 0x823F4F40 = { name = "issMap__Update" }
 0x824046C0 = { name = "issCamera__Update" }
 0x82406688 = { name = "issObject__Update" }
 0x8240F540 = { name = "issActor__Update" }
-0x82411610 = { name = "issEffect__vf02" }
-0x82412688 = { name = "issSprite__vf02" }
-0x82416DD0 = { name = "issLight__vf02" }
+0x82410568 = { name = "issActor__Draw" }
+0x8240D6F8 = { name = "issActor__ApplyBoneTransforms" }
+0x8240ACF0 = { name = "issActor__ProcessCommand" }
+0x82405938 = { name = "issObject__ProcessCommand" }
+0x82406E08 = { name = "issObject__Draw" }
+0x821621C8 = { name = "CharaVO__BuildBoneMatrices" }
+0x82168180 = { name = "CharaVO__vf10" }
+0x822BA360 = { name = "Enemy__BuildTransformMatrix" }
+0x82411610 = { name = "issEffect__Update" }
+0x82412688 = { name = "issSprite__Update" }
+0x82416DD0 = { name = "issLight__Update" }
 0x823F7680 = { name = "issEvent__Update" }
 0x82403E30 = { name = "issCamera__ProcessCommand" }
 0x82401448 = { name = "issFrame__Draw" }
@@ -16,9 +24,9 @@
 0x82575F90 = { name = "bdPhysicalIndexBufferCreate" }
 0x820C03A0 = { name = "SequenceHolder_SequenceUnitBase_ctor", size = 0x80 }
 0x820C0428 = { name = "SequenceHolder_SequenceUnit_ctor", size = 0x7C }
-0x820C04A8 = { name = "SequenceUnit_vf01_InvokeFactory", size = 0x68 }
+0x820C04A8 = { name = "SequenceHolder__SequenceUnit__InvokeFactory", size = 0x68 }
 0x820C0510 = { name = "SequenceHolder_RegisterSequence" }
-0x820C0588 = { name = "SequenceUnitBase_vf00_Destructor", size = 0x44 }
+0x820C0588 = { name = "SequenceHolder__SequenceUnitBase__Dtor", size = 0x44 }
 0x820C06B8 = { name = "bdRegisterMainSequences", size = 0x380 }
 0x820C0A38 = { name = "bdDebugMenuSetup", size = 0x444 }
 0x820C0E80 = { name = "SequenceHolder_SequenceUnitBase_dtor", size = 0x70 }
@@ -26,8 +34,8 @@
 0x820C1178 = { name = "bdSystemDataInit", size = 0x120 }
 0x820C1378 = { name = "SequenceUnitParam1_GameTask_ctor", size = 0xAC }
 0x820C1428 = { name = "SequenceUnitParam1_vf01_InvokeFactoryWithParam", size = 0x6C }
-0x820C1498 = { name = "SequenceUnitParam1_DebugMenuLevel_vf01_InvokeFactory", size = 0x58 }
-0x820C14F0 = { name = "SequenceUnit_vf00_Destructor", size = 0x4C }
+0x820C1498 = { name = "SequenceUnitParam1_DebugMenuLevel__InvokeFactory", size = 0x58 }
+0x820C14F0 = { name = "SequenceHolder__SequenceUnit__Dtor", size = 0x4C }
 0x820C1540 = { name = "SequenceUnitParam1_vf00_Destructor", size = 0x70 }
 0x820C1C20 = { name = "SequenceHolder_RegisterSequenceParam1_TitleTask", size = 0xDC }
 0x820C1D00 = { name = "SequenceHolder_RegisterSequenceParam1_GameTask", size = 0x7C }
@@ -90,8 +98,8 @@
 0x820D0CE8 = { name = "bdMindowsCreateNode", size = 0x1E4 }
 0x820D0F58 = { name = "bdMindowsDestroyPanel", size = 0xC0 }
 0x820D1018 = { name = "bdSoundDebugNavigator", size = 0x488 }
-0x820D17C8 = { name = "AnimeVar_Pos_vf00", size = 0x44 }
-0x820D1810 = { name = "AnimeVar_Color_vf00", size = 0x44 }
+0x820D17C8 = { name = "AnimeVar__Pos__Dtor", size = 0x44 }
+0x820D1810 = { name = "AnimeVar__Color__Dtor", size = 0x44 }
 0x820D18D8 = { name = "D2AnimeTask_SetColorVar", size = 0x74 }
 0x820D1998 = { name = "rex_DebugPrint", size = 0x8 }
 0x820D19A0 = { name = "bdMoonLaserTaskConstruct", size = 0x394 }
@@ -105,6 +113,7 @@
 0x820E4288 = { name = "bdMatrix4x4Copy", size = 0x84 }
 0x820F7068 = { name = "bdDefaultRenderFunc", size = 0x8 }
 0x820F8C08 = { name = "bdMechaSuitParameterLoadStep", size = 0xD4 }
+0x820FC3F8 = { name = "bdDoubleBufferAcquire" }
 0x8210F1D8 = { name = "mgMS__helper_F1D8" }
 0x8211B4B8 = { name = "bdForEachVisualCallback", size = 0x68 }
 0x8211BD48 = { name = "bdVisualSetAlpha", size = 0xD8 }
@@ -118,10 +127,10 @@
 0x82126708 = { name = "bdGameSubsystemInit", size = 0x1E0 }
 0x821268E8 = { name = "bdGameTasksInit", size = 0x210 }
 0x82126AF8 = { name = "bdMainGameStep", size = 0x350 }
-0x82126EA0 = { name = "SequenceDebugMenu_vf00_Destructor", size = 0x48 }
+0x82126EA0 = { name = "SequenceDebugMenu__Dtor", size = 0x48 }
 0x82126EE8 = { name = "SequenceDebugMenuTask_Factory", size = 0x60 }
 0x82126F48 = { name = "bdDebugMenuTaskConstruct", size = 0x198 }
-0x821270E0 = { name = "SequenceDebugMenuTask_vf00_Destructor", size = 0x50 }
+0x821270E0 = { name = "SequenceDebugMenuTask__dtor", size = 0x50 }
 0x82127130 = { name = "bdDebugMenuTaskDestruct", size = 0xE4 }
 0x82127218 = { name = "bdSequenceModuleCopyName", size = 0x64 }
 0x82127280 = { name = "bdSequenceModuleSelect", size = 0x13C }
@@ -130,12 +139,12 @@
 0x82127748 = { name = "bdDebugMenuTabSwitch", size = 0x158 }
 0x821278A0 = { name = "bdDebugMenuSetActiveTab", size = 0x68 }
 0x82127908 = { name = "bdDebugMenuSelectItem", size = 0x78 }
-0x82127980 = { name = "SequenceDebugMenuTask_vf03_Draw", size = 0x34 }
+0x82127980 = { name = "SequenceDebugMenuTask__Draw", size = 0x34 }
 0x821279B8 = { name = "bdSequenceModuleInit", size = 0x28C }
-0x82127C48 = { name = "SequenceDebugMenuTask_vf00_AdjThunk", size = 0x8 }
-0x82127C50 = { name = "SequenceControl_vf00", size = 0x68 }
-0x82127CB8 = { name = "SequenceControl_vf02", size = 0xC0 }
-0x82127D78 = { name = "SequenceControl_vf04", size = 0x18 }
+0x82127C48 = { name = "SequenceDebugMenuTask__Dtor", size = 0x8 }
+0x82127C50 = { name = "SequenceControl__dtor", size = 0x68 }
+0x82127CB8 = { name = "SequenceControl__TransitionDispatch", size = 0xC0 }
+0x82127D78 = { name = "SequenceControl__OnSequenceComplete", size = 0x18 }
 0x82127D90 = { name = "SequenceHolder_FindSequenceByName", size = 0xD0 }
 0x821282D0 = { name = "bdLoaderInit", size = 0x320 }
 0x821286D8 = { name = "bdFileManagerUpdate", size = 0x17C }
@@ -156,7 +165,7 @@
 0x8212A698 = { name = "bdSceneTreeIsVisible", size = 0x84 }
 0x8212A720 = { name = "bdSceneTreeTraverseAndDraw", size = 0x6C }
 0x8212A790 = { name = "bdSceneTreeDebugPrint", size = 0x154 }
-0x8212A8E8 = { name = "AnimeVar_Uv_vf00", size = 0x48 }
+0x8212A8E8 = { name = "AnimeVar__Uv__Dtor", size = 0x48 }
 0x8212A930 = { name = "AnimeVar_helper_A930", size = 0x20 }
 0x8212AB58 = { name = "LH_Binary__LoadAsync" }
 0x8212AC48 = { name = "D2AnimeTask_dtor_scalar", size = 0x50 }
@@ -251,9 +260,9 @@
 0x8213D578 = { name = "bdRenderSortBucketConfig", size = 0x160 }
 0x8213D6D8 = { name = "bdLightDataInit", size = 0xE8 }
 0x8213D7C0 = { name = "bdLightDataDestroy", size = 0x110 }
-0x8213EC10 = { name = "bd_Sound_SndMgr_vf00", size = 0x88 }
-0x8213EC98 = { name = "bd_Sound_SndMgr_vf01", size = 0x7C }
-0x8213ED18 = { name = "bd_Sound_SndMgr_vf03", size = 0x38 }
+0x8213EC10 = { name = "bd__Sound__SndMgr__Dtor", size = 0x88 }
+0x8213EC98 = { name = "bd__Sound__SndMgr__Init", size = 0x7C }
+0x8213ED18 = { name = "bd__Sound__SndMgr__Draw", size = 0x38 }
 0x8213F518 = { name = "bdRenderQueueSubmit", size = 0x70 }
 0x8213F738 = { name = "bdRandomFloatRange", size = 0x80 }
 0x8213F7B8 = { name = "bdVisualObjectConstruct", size = 0x578 }
@@ -346,37 +355,39 @@
 0x8214E2D0 = { name = "AnimeData_helper_E2D0", size = 0xF0 }
 0x8214E3C0 = { name = "AnimeData_LineOrg_ctor", size = 0x84 }
 0x8214E448 = { name = "AnimeData_LineData_ctor", size = 0x160 }
-0x8214E5A8 = { name = "AnimeData_Data_vf00", size = 0x50 }
-0x8214E5F8 = { name = "AnimeData_TexOrg_vf00", size = 0x50 }
+0x8214E5A8 = { name = "AnimeData__Data__Dtor", size = 0x50 }
+0x8214E5F8 = { name = "AnimeData__TexOrg__Dtor", size = 0x50 }
 0x8214E648 = { name = "AnimeVar_Pos_ctor_4", size = 0x16C }
-0x8214E7B8 = { name = "AnimeData_TexData_vf00", size = 0x80 }
-0x8214E838 = { name = "AnimeData_TexRotOrg_vf00", size = 0x5C }
-0x8214E898 = { name = "AnimeData_TexRotData_vf00", size = 0x50 }
-0x8214E8E8 = { name = "AnimeData_MsgOrg_vf00", size = 0x50 }
-0x8214E938 = { name = "AnimeData_MsgData_vf00", size = 0x74 }
-0x8214E9B0 = { name = "AnimeData_FrameOrg_vf00", size = 0x5C }
-0x8214EA10 = { name = "AnimeData_FrameData_vf00", size = 0x74 }
-0x8214EA88 = { name = "AnimeData_WaitOrg_vf00", size = 0x5C }
-0x8214EAE8 = { name = "AnimeData_WndOrg_vf00", size = 0x5C }
-0x8214EB48 = { name = "AnimeData_WndData_vf00", size = 0x74 }
-0x8214EBC0 = { name = "AnimeData_D2AniOrg_vf00", size = 0x50 }
-0x8214EC10 = { name = "AnimeData_D2AniData_vf00", size = 0x50 }
-0x8214EC60 = { name = "AnimeData_MenuOrg_vf00", size = 0x50 }
+0x8214E7B8 = { name = "AnimeData__TexData__Dtor", size = 0x80 }
+0x8214E838 = { name = "AnimeData__TexRotOrg__Dtor", size = 0x5C }
+0x8214E898 = { name = "AnimeData__TexRotData__Dtor", size = 0x50 }
+0x8214E8E8 = { name = "AnimeData__MsgOrg__Dtor", size = 0x50 }
+0x8214E938 = { name = "AnimeData__MsgData__Dtor", size = 0x74 }
+0x8214E9B0 = { name = "AnimeData__FrameOrg__Dtor", size = 0x5C }
+0x8214EA10 = { name = "AnimeData__FrameData__Dtor", size = 0x74 }
+0x8214EA88 = { name = "AnimeData__WaitOrg__Dtor", size = 0x5C }
+0x8214EAE8 = { name = "AnimeData__WndOrg__Dtor", size = 0x5C }
+0x8214EB48 = { name = "AnimeData__WndData__Dtor", size = 0x74 }
+0x8214EBC0 = { name = "AnimeData__D2AniOrg__Dtor", size = 0x50 }
+0x8214EC10 = { name = "AnimeData__D2AniData__Dtor", size = 0x50 }
+0x8214EC60 = { name = "AnimeData__MenuOrg__Dtor", size = 0x50 }
 0x8214ECB0 = { name = "AnimeData_helper_ECB0", size = 0x68 }
-0x8214ED18 = { name = "AnimeData_MenuData_vf00", size = 0x74 }
-0x8214ED90 = { name = "AnimeData_TransOrg_vf00", size = 0x50 }
-0x8214EDE0 = { name = "AnimeData_TransData_vf00", size = 0x74 }
-0x8214EE58 = { name = "AnimeData_LineOrg_vf00", size = 0x5C }
-0x8214EEB8 = { name = "AnimeData_LineData_vf00", size = 0x74 }
+0x8214ED18 = { name = "AnimeData__MenuData__Dtor", size = 0x74 }
+0x8214ED90 = { name = "AnimeData__TransOrg__Dtor", size = 0x50 }
+0x8214EDE0 = { name = "AnimeData__TransData__Dtor", size = 0x74 }
+0x8214EE58 = { name = "AnimeData__LineOrg__Dtor", size = 0x5C }
+0x8214EEB8 = { name = "AnimeData__LineData__Dtor", size = 0x74 }
 0x8214EF30 = { name = "AnimeData_helper_EF30", size = 0x94 }
 0x8214EFC8 = { name = "AnimeData_nearby_EFC8", size = 0xDC }
 0x8214F0A8 = { name = "AnimeData_MsgData_ctor", size = 0x3CC }
 0x8214F478 = { name = "AnimeData_method_F478", size = 0x12C }
 0x8214F5A8 = { name = "D2AnimeCSV_ParseElementType", size = 0x1E8 }
-0x8214FD20 = { name = "AnimeData_vf00", size = 0x50 }
+0x8214FD20 = { name = "AnimeData__Dtor", size = 0x50 }
 0x82150060 = { name = "bdD2AnimLoadFile", size = 0x290 }
 0x82150BB0 = { name = "AnimeData_PollLoadState", size = 0x47C }
+0x82151790 = { name = "AnimeVarTrack_Apply" }
 0x82151B08 = { name = "AnimeData_AdvanceFrame", size = 0x11C }
+0x82151C28 = { name = "AnimeData_SyncDerivedVars" }
 0x82152098 = { name = "AnimeVarBag_FindChildByName", size = 0x100 }
 0x82152198 = { name = "AnimeVarBag_FindVar", size = 0x164 }
 0x82152368 = { name = "AnimeVarBag_SetColorRGBA", size = 0x64 }
@@ -391,71 +402,71 @@
 0x82153CC0 = { name = "AnimeData_ResetAnimChains", size = 0x7C }
 0x82153FC8 = { name = "AnimeData_ResetChildTimers", size = 0x88 }
 0x821540F8 = { name = "AnimeData_D2AniOrg_ctor_2", size = 0xC8 }
-0x82154A78 = { name = "AnimeData_Cmd_AnimeData_TexData_AnimeData_TexOrg_vf00", size = 0x48 }
-0x82154AC0 = { name = "AnimeData_Cmd_AnimeData_TexRotData_AnimeData_TexRotOrg_vf00", size = 0x48 }
-0x82154B08 = { name = "AnimeData_Cmd_AnimeData_MsgData_AnimeData_MsgOrg_vf00", size = 0x48 }
-0x82154B50 = { name = "AnimeData_Cmd_AnimeData_FrameData_AnimeData_FrameOrg_vf00", size = 0x48 }
-0x82154B98 = { name = "AnimeData_Cmd_AnimeData_WndData_AnimeData_WndOrg_vf00", size = 0x48 }
-0x82154BE0 = { name = "AnimeData_Cmd_AnimeData_D2AniData_AnimeData_D2AniOrg_vf00", size = 0x48 }
-0x82154C28 = { name = "AnimeData_Cmd_AnimeData_MenuData_AnimeData_MenuOrg_vf00", size = 0x48 }
-0x82154C70 = { name = "AnimeData_Cmd_AnimeData_TransData_AnimeData_TransOrg_vf00", size = 0x48 }
-0x82154CB8 = { name = "AnimeData_Cmd_AnimeData_LineData_AnimeData_LineOrg_vf00", size = 0x48 }
+0x82154A78 = { name = "AnimeData__Cmd_TexData__Dtor", size = 0x48 }
+0x82154AC0 = { name = "AnimeData__Cmd_TexRotData__Dtor", size = 0x48 }
+0x82154B08 = { name = "AnimeData__Cmd_MsgData__Dtor", size = 0x48 }
+0x82154B50 = { name = "AnimeData__Cmd_FrameData__Dtor", size = 0x48 }
+0x82154B98 = { name = "AnimeData__Cmd_WndData__Dtor", size = 0x48 }
+0x82154BE0 = { name = "AnimeData__Cmd_D2AniData__Dtor", size = 0x48 }
+0x82154C28 = { name = "AnimeData__Cmd_MenuData__Dtor", size = 0x48 }
+0x82154C70 = { name = "AnimeData__Cmd_TransData__Dtor", size = 0x48 }
+0x82154CB8 = { name = "AnimeData__Cmd_LineData__Dtor", size = 0x48 }
 0x82154FD8 = { name = "AnimeData_helper_4FD8", size = 0x168 }
 0x82155B78 = { name = "D2AnimeTask_ParseCSVElements", size = 0x1154 }
 0x82156CD0 = { name = "AnimeData_WaitOrg_ctor_2", size = 0x1154 }
 0x821595B0 = { name = "AnimeData_Cmd_AnimeData_TexData_AnimeData_TexOrg_ctor", size = 0xFC }
 0x821596B0 = { name = "AnimeData_method_96B0", size = 0x6C }
 0x82159AB8 = { name = "AnimeMenu_ParseMenuSetCmd", size = 0x2B0 }
-0x8215A2B0 = { name = "AnimeData_MenuData_vf00_2", size = 0x8 }
-0x8215A2B8 = { name = "AnimeData_FrameData_vf00_2", size = 0x8 }
-0x8215A2C0 = { name = "AnimeData_MsgData_vf00_2", size = 0x8 }
-0x8215A2C8 = { name = "AnimeData_TexData_vf00_2", size = 0x8 }
-0x8215A2D0 = { name = "AnimeData_TransData_vf00_2", size = 0x8 }
-0x8215A2D8 = { name = "AnimeData_D2AniData_vf00_2", size = 0x8 }
-0x8215A2E0 = { name = "AnimeData_WndData_vf00_2", size = 0x8 }
-0x8215A2E8 = { name = "AnimeData_TexRotData_vf00_2", size = 0x8 }
-0x8215A2F0 = { name = "AnimeData_LineData_vf00_2", size = 0x8 }
+0x8215A2B0 = { name = "AnimeData__MenuData__DtorThunk", size = 0x8 }
+0x8215A2B8 = { name = "AnimeData__FrameData__DtorThunk", size = 0x8 }
+0x8215A2C0 = { name = "AnimeData__MsgData__DtorThunk", size = 0x8 }
+0x8215A2C8 = { name = "AnimeData__TexData__DtorThunk", size = 0x8 }
+0x8215A2D0 = { name = "AnimeData__TransData__DtorThunk", size = 0x8 }
+0x8215A2D8 = { name = "AnimeData__D2AniData__DtorThunk", size = 0x8 }
+0x8215A2E0 = { name = "AnimeData__WndData__DtorThunk", size = 0x8 }
+0x8215A2E8 = { name = "AnimeData__TexRotData__DtorThunk", size = 0x8 }
+0x8215A2F0 = { name = "AnimeData__LineData__DtorThunk", size = 0x8 }
 0x8215A628 = { name = "bd_Vibration_VibrationHandleTask_ctor", size = 0x64 }
-0x8215A690 = { name = "bd_Vibration_VibrationHandleTask_vf02", size = 0x104 }
-0x8215A798 = { name = "bd_Vibration_VibrationHandleTask_vf03", size = 0x3C }
-0x8215A7D8 = { name = "bd_Vibration_VibrationHandleTask_vf00", size = 0x50 }
+0x8215A690 = { name = "bd__Vibration__VibrationHandleTask__Update", size = 0x104 }
+0x8215A798 = { name = "bd__Vibration__VibrationHandleTask__Draw", size = 0x3C }
+0x8215A7D8 = { name = "bd__Vibration__VibrationHandleTask__Dtor", size = 0x50 }
 0x8215AF68 = { name = "bdLoadXmlDataFile", size = 0x180 }
 0x8215B0E8 = { name = "bdLoadVibrationData", size = 0xA0 }
 0x8215B8D8 = { name = "AnimeVar_Var_ctor", size = 0x5C }
-0x8215B938 = { name = "AnimeVar_Var_vf00", size = 0x50 }
-0x8215B988 = { name = "AnimeVar_vf00", size = 0x50 }
+0x8215B938 = { name = "AnimeVar__Var__Dtor", size = 0x50 }
+0x8215B988 = { name = "AnimeVar__Dtor", size = 0x50 }
 0x8215B9D8 = { name = "AnimeVar_ctor", size = 0x9C }
 0x8215BC20 = { name = "AnimeVar_ApplyFloatKeyframes", size = 0x244 }
 0x8215BE68 = { name = "AnimeVar_MatchElementSuffix", size = 0x10C }
 0x8215BF78 = { name = "AnimeVar_MatchUVSuffix", size = 0x10C }
 0x8215C088 = { name = "AnimeVar_MatchColorSuffix", size = 0x10C }
 0x8215C198 = { name = "AnimeVarBag_FindVarInContainer", size = 0x8F8 }
-0x8215CC40 = { name = "AnimeVar_vPos_vf00", size = 0x50 }
+0x8215CC40 = { name = "AnimeVar__vPos__Dtor", size = 0x50 }
 0x8215CC90 = { name = "AnimeVar_vPos_ctor", size = 0x120 }
 0x8215CDB0 = { name = "AnimeVar_vPos_ctor_2", size = 0x254 }
 0x8215D008 = { name = "AnimeVar_nearby_D008", size = 0x74 }
-0x8215D080 = { name = "AnimeVar_vUv_vf00", size = 0x50 }
+0x8215D080 = { name = "AnimeVar__vUv__Dtor", size = 0x50 }
 0x8215D0D0 = { name = "AnimeVar_Uv_ctor", size = 0xF4 }
 0x8215D1C8 = { name = "AnimeVar_Uv_dtor", size = 0x1F4 }
-0x8215D3C0 = { name = "AnimeVar_vColor_vf00", size = 0x50 }
+0x8215D3C0 = { name = "AnimeVar__vColor__Dtor", size = 0x50 }
 0x8215D410 = { name = "AnimeVar_Color_ctor_2", size = 0xF4 }
 0x8215D508 = { name = "AnimeVar_SetColorComponents", size = 0x8C }
 0x8215D598 = { name = "AnimeVar_Color_dtor", size = 0x1F4 }
 0x8215D790 = { name = "AnimeVar_ApplyColorKeyframes", size = 0x64 }
 0x8215D7F8 = { name = "AnimeVar_vFloat_ctor", size = 0x9C }
-0x8215D898 = { name = "AnimeVar_vFloat_vf00", size = 0x50 }
+0x8215D898 = { name = "AnimeVar__vFloat__Dtor", size = 0x50 }
 0x8215D8E8 = { name = "AnimeVar_Var_dtor", size = 0xBC }
 0x8215D9A8 = { name = "AnimeVar_vString_ctor", size = 0xAC }
-0x8215DA58 = { name = "AnimeVar_vString_vf00", size = 0x50 }
+0x8215DA58 = { name = "AnimeVar__vString__Dtor", size = 0x50 }
 0x8215DAA8 = { name = "AnimeVar_Var_dtor_2", size = 0xE4 }
 0x8215DB90 = { name = "AnimeVar_PropagateStringToElements", size = 0x250 }
 0x8215DE48 = { name = "AnimeVar_vBool_ctor", size = 0xA8 }
-0x8215DEF0 = { name = "AnimeVar_vBool_vf00", size = 0x50 }
+0x8215DEF0 = { name = "AnimeVar__vBool__Dtor", size = 0x50 }
 0x8215DF40 = { name = "AnimeVar_Var_dtor_3", size = 0xBC }
 0x8215F170 = { name = "AnimeData_helper_F170", size = 0x37C }
-0x8215F870 = { name = "AnimeVar_vPos_vf00_2", size = 0x8 }
-0x8215F878 = { name = "AnimeVar_vUv_vf00_2", size = 0x8 }
-0x8215F880 = { name = "AnimeVar_vColor_vf00_2", size = 0x8 }
+0x8215F870 = { name = "AnimeVar__vPos__DtorThunk", size = 0x8 }
+0x8215F878 = { name = "AnimeVar__vUv__DtorThunk", size = 0x8 }
+0x8215F880 = { name = "AnimeVar__vColor__DtorThunk", size = 0x8 }
 0x82160038 = { name = "bdAnimCurveSample3", size = 0xE8 }
 0x821678D0 = { name = "bdSceneNodeFindByIndex", size = 0x70 }
 0x82168308 = { name = "bdMatrixInverse4x4", size = 0x238 }
@@ -478,15 +489,15 @@
 0x82169FD0 = { name = "bdMatrixDeterminant4x4", size = 0xA4 }
 0x8216BC48 = { name = "bdMapNameToIndex", size = 0x60 }
 0x8216BCA8 = { name = "bdColorMultiply", size = 0xC8 }
-0x8216C1D0 = { name = "bd_Cursor_CurTask_vf00", size = 0x5C }
-0x8216C230 = { name = "bd_Cursor_CurTask_vf02", size = 0xC4 }
-0x8216C3E8 = { name = "bd_Cursor_CurTask_vf03", size = 0x144 }
+0x8216C1D0 = { name = "bd__Cursor__CurTask__Dtor", size = 0x5C }
+0x8216C230 = { name = "bd__Cursor__CurTask__Update", size = 0xC4 }
+0x8216C3E8 = { name = "bd__Cursor__CurTask__Draw", size = 0x144 }
 0x8216C530 = { name = "AnimeData_helper_C530", size = 0x68 }
 0x8216ED28 = { name = "bdCollisionRaycast", size = 0x50 }
 0x8216EF60 = { name = "bdUvAnimInit", size = 0xB4 }
 0x8216F018 = { name = "bdUiCharUvCacheInit" }
-0x8216FA58 = { name = "bd_Error_vf00", size = 0x68 }
-0x8216FAC0 = { name = "bd_Error_vf03", size = 0x1C4 }
+0x8216FA58 = { name = "bd__Error__Dtor", size = 0x68 }
+0x8216FAC0 = { name = "bd__Error__Draw", size = 0x1C4 }
 0x82170B28 = { name = "bdFindEntityByHandle", size = 0x64 }
 0x82171950 = { name = "bdSoundCueUpdate", size = 0xB84 }
 0x821724D8 = { name = "bdSoundCueLock", size = 0x58 }
@@ -578,7 +589,7 @@
 0x82190588 = { name = "bdSoundBankPrepare", size = 0x1EC }
 0x82190778 = { name = "bdSoundBankPlay", size = 0x180 }
 0x821908F8 = { name = "bdSoundBankPlayCue", size = 0x370 }
-0x82190D48 = { name = "PadVibrationCore__vf03" }
+0x82190D48 = { name = "PadVibrationCore__Draw" }
 0x82192410 = { name = "bdFindMaxElement", size = 0x64 }
 0x82192550 = { name = "bdStringBufferFree", size = 0x58 }
 0x821983E8 = { name = "bdHdbFileInit", size = 0x134 }
@@ -592,9 +603,9 @@
 0x82199FF0 = { name = "bdHdbHeaderParseSwapped", size = 0xD4 }
 0x8219A118 = { name = "bdMessageImportConstruct", size = 0x154 }
 0x8219BBB8 = { name = "ScriptManTask__dtor", size = 0x1B4 }
-0x8219BD70 = { name = "ScriptManTask__vf01_Init", size = 0xC9C }
+0x8219BD70 = { name = "ScriptManTask__Init", size = 0xC9C }
 0x8219D608 = { name = "bdMapEventTrigger", size = 0xFC }
-0x8219D708 = { name = "ScriptManTask__vf02_Update", size = 0x36F4 }
+0x8219D708 = { name = "ScriptManTask__Update", size = 0x36F4 }
 0x821A0E98 = { name = "bdScriptCharFindAnimEntry", size = 0xDC }
 0x821A0F78 = { name = "bdFieldHUDUpdate", size = 0x13D4 }
 0x821A2410 = { name = "ScriptManTask__UnloadScript" }
@@ -612,6 +623,7 @@
 0x821A5198 = { name = "bdScriptLoadAreaSounds", size = 0x19C }
 0x821A57F8 = { name = "bdScriptOpScreenFade", size = 0x100 }
 0x821A58F8 = {}
+0x821A66B0 = { name = "ScriptWindow__Draw" }
 0x821A7058 = { name = "bdScriptCloseDialogue", size = 0x7C }
 0x821A7A58 = { name = "bdScriptLookupButtonIcon", size = 0x1F4 }
 0x821A8190 = { name = "bdScriptEntityCleanup", size = 0x2BC }
@@ -683,22 +695,22 @@
 0x821BF050 = { name = "bdScriptOpQuestPatch", size = 0x1B0 }
 0x821C2E78 = { name = "bdShopTaskConstruct", size = 0x368 }
 0x821CA0B0 = { name = "Shop__MainTask__UpdateCount" }
-0x821CE1D8 = { name = "gsContentInfoFile_vf00", size = 0x5C }
+0x821CE1D8 = { name = "gsContentInfoFile__Dtor", size = 0x5C }
 0x821CE238 = { name = "gsContentFileManager_StartEnumeration", size = 0x16C }
 0x821CE3B0 = { name = "gsContentEnumerator_ThreadMain", size = 0x210 }
-0x821CE5C0 = { name = "gsContentMounter_vf00", size = 0x84 }
+0x821CE5C0 = { name = "gsContentMounter__Dtor", size = 0x84 }
 0x821CE648 = { name = "gsContentFileManager_CloseAll", size = 0x170 }
 0x821CE7B8 = { name = "gsContentInfoFile_ctor", size = 0x250 }
 0x821CEA08 = { name = "gsContentFileManager_GetMountedCount", size = 0x24 }
 0x821CEA30 = { name = "gsContentFileManager_AddDriveName", size = 0xC4 }
 0x821CEAF8 = { name = "gsContentInfoFile_helper_EAF8", size = 0xC8 }
 0x821CED70 = { name = "gsContentInfoFile_helper_ED70", size = 0xDC }
-0x821CF758 = { name = "gsContentEnumerator_vf00", size = 0x58 }
+0x821CF758 = { name = "gsContentEnumerator__Dtor", size = 0x58 }
 0x821CF7B0 = { name = "gsContentEnumerator_helper_F7B0", size = 0x54 }
 0x821CF808 = { name = "gsContentEnumerator_helper_F808", size = 0xD8 }
 0x821CF8E0 = { name = "gsContentMounter_ctor", size = 0x9C }
 0x821CF980 = { name = "gsContentMounter_MountContent", size = 0x128 }
-0x821CFAA8 = { name = "gsContentInfoReader_vf00", size = 0x78 }
+0x821CFAA8 = { name = "gsContentInfoReader__Dtor", size = 0x78 }
 0x821CFB20 = { name = "gsContentInfoFile_ReadInfoTxt", size = 0x150 }
 0x821D03D0 = { name = "bdSceneSpeedReset", size = 0x144 }
 0x821D0518 = { name = "bdBattleMotionTestSetup", size = 0x608 }
@@ -711,7 +723,7 @@
 0x821D6820 = { name = "bdCsvReadFieldW", size = 0x1C0 }
 0x821D9550 = { name = "bdBtlMotionScriptDatabaseConstruct", size = 0x450 }
 0x821DAD58 = { name = "bdBattleEffectInit", size = 0x228 }
-0x821DDC38 = { name = "CommandSelectTask__vf02" }
+0x821DDC38 = { name = "CommandSelectTask__Update" }
 0x821DF5B8 = { name = "CommandSelectTask_SetSelection" }
 0x821DF698 = { name = "bdBattleGetCurrentAnimId", size = 0x60 }
 0x821E1CC8 = { name = "bdComputeSpeedInterp", size = 0x9C }
@@ -910,7 +922,7 @@
 0x82285360 = { name = "hcgTextureCacheAdd" }
 0x8228B4D8 = { name = "FreeDfsTask_SetViewScreenSize" }
 0x8228C090 = { name = "FreeDfsTask_BuildViewProjection" }
-0x8228CA60 = { name = "FreeDfsTask__vf03", size = 0x21C }
+0x8228CA60 = { name = "FreeDfsTask__Draw", size = 0x21C }
 0x82285470 = { name = "hcgReadTextureFile", size = 0x1B8 }
 0x82285628 = { name = "bdAllocRenderBuffer", size = 0x1A0 }
 0x822857C8 = { name = "bdCreateTextureFromMemory", size = 0x114 }
@@ -943,7 +955,7 @@
 0x82291AE8 = { name = "bdLoadAllFonts", size = 0x178 }
 0x82291C60 = { name = "bdFontSystemInit", size = 0x108 }
 0x82291D68 = { name = "AnimeVar_SetWideString", size = 0x98 }
-0x82292120 = { name = "bd_Colli_Object_vf00", size = 0x4C }
+0x82292120 = { name = "bd__Colli__Object__Dtor", size = 0x4C }
 0x82292170 = { name = "bdMdlTextFileParse", size = 0x3258 }
 0x82295680 = { name = "bdMdlTextFilePostProcess", size = 0xB6C }
 0x822A1A98 = { name = "bdParseFloatFromString", size = 0x11C }
@@ -984,7 +996,7 @@
 0x822D5528 = { name = "bdGetFontLineHeight", size = 0x5C }
 0x822D5588 = { name = "bdCampConfigDataLoad", size = 0x134 }
 0x822D5988 = { name = "Camp__Config__MainTask__BuildRows" }
-0x822D69E8 = { name = "Camp__Config__MainTask__vf02", size = 0x64 }
+0x822D69E8 = { name = "Camp__Config__MainTask__Update", size = 0x64 }
 0x822D6A50 = { name = "bdCampConfigSetState", size = 0x5AC }
 0x822D7728 = { name = "bdCampMainTaskConstruct", size = 0x3F4 }
 0x822DAD50 = { name = "bdCampDataTaskConstruct", size = 0x458 }
@@ -993,7 +1005,7 @@
 0x822E43C0 = { name = "bdEquipItemStatUpdate", size = 0x578 }
 0x822E5360 = { name = "bdEquipScreenSetup", size = 0x57C }
 0x822E6978 = { name = "bdCampRankConstruct", size = 0x200 }
-0x822E6F40 = { name = "Camp__Rank__MainTask__vf02" }
+0x822E6F40 = { name = "Camp__Rank__MainTask__Update" }
 0x822E76F8 = { name = "CampRank_UpdateCursorPosName" }
 0x822E77B0 = { name = "CampRank_ApplySlotUVs" }
 0x822E84B0 = { name = "bdCampShowSkillLoad", size = 0x208 }
@@ -1061,18 +1073,18 @@
 0x823747A0 = { name = "bdEventPackLoad", size = 0x2A8 }
 0x82375C50 = { name = "bdItemTableFindById", size = 0x50 }
 0x82380050 = { name = "SelMesWinTask_ctor", size = 0x174 }
-0x823801C8 = { name = "SelMesWinTask_vf00", size = 0x74 }
+0x823801C8 = { name = "SelMesWinTask__Dtor", size = 0x74 }
 0x82380240 = { name = "SelMesWinTask_Create", size = 0x58 }
-0x82380298 = { name = "SelMesWinTask_vf01", size = 0x2E0 }
-0x82380578 = { name = "SelMesWinTask_vf02", size = 0x6C }
-0x823805E8 = { name = "SelMesWinTask_vf03", size = 0x1C8 }
+0x82380298 = { name = "SelMesWinTask__Init", size = 0x2E0 }
+0x82380578 = { name = "SelMesWinTask__Update", size = 0x6C }
+0x823805E8 = { name = "SelMesWinTask__Draw", size = 0x1C8 }
 0x823807B0 = { name = "SelMesWinConfig_LoadStrings", size = 0x428 }
 0x82380BD8 = { name = "NormMesWinTask_ctor", size = 0x170 }
-0x82380D48 = { name = "NormMesWinTask_vf00", size = 0x74 }
+0x82380D48 = { name = "NormMesWinTask__Dtor", size = 0x74 }
 0x82380DC0 = { name = "NormMesWinTask_Create", size = 0x58 }
-0x82380E18 = { name = "NormMesWinTask_vf01", size = 0x1A4 }
-0x82380FC0 = { name = "NormMesWinTask_vf02", size = 0x48 }
-0x82381008 = { name = "NormMesWinTask_vf03", size = 0x1C8 }
+0x82380E18 = { name = "NormMesWinTask__Init", size = 0x1A4 }
+0x82380FC0 = { name = "NormMesWinTask__Update", size = 0x48 }
+0x82381008 = { name = "NormMesWinTask__Draw", size = 0x1C8 }
 0x823811D0 = { name = "NormMesWinConfig_LoadStrings", size = 0x380 }
 0x82381550 = { name = "SelWinConfig_Init", size = 0xAC }
 0x82381600 = { name = "SaveDataTask_Factory", size = 0x74 }
@@ -1081,29 +1093,29 @@
 0x823818D8 = { name = "SaveDataTask_EnumerateSlots", size = 0x9C }
 0x82381978 = { name = "bdSaveSlotRescan", size = 0x1E8 }
 0x82381B60 = { name = "SaveDataTask_ParseSlotFromBuffer", size = 0x204 }
-0x82381DA0 = { name = "SaveDataTask_vf01_Init", size = 0x360 }
-0x82382100 = { name = "SaveDataTask_vf02_Update", size = 0xD64 }
-0x82382E68 = { name = "SaveDataTask_vf03_Draw", size = 0x7C }
+0x82381DA0 = { name = "SaveDataTask__Init", size = 0x360 }
+0x82382100 = { name = "SaveDataTask__Update", size = 0xD64 }
+0x82382E68 = { name = "SaveDataTask__Draw", size = 0x7C }
 0x82382EE8 = { name = "SaveDataTask_OnSlotConfirm", size = 0x138 }
 0x82383020 = { name = "bdSaveGameWrite", size = 0x39C }
 0x823833C0 = { name = "bdSaveGameWriteThumbnail", size = 0xC4 }
-0x82383488 = { name = "SaveDataTask_vf04", size = 0x68 }
+0x82383488 = { name = "SaveDataTask__OnChildComplete", size = 0x68 }
 0x823834F0 = { name = "SaveDataTask_ShowSavingMessage", size = 0xBC }
 0x823835B0 = { name = "bdPlayerSaveSerialize", size = 0x200 }
 0x823842D8 = { name = "SelWinTask_ctor", size = 0x17C }
-0x82384458 = { name = "SelWinTask_vf00", size = 0x74 }
-0x823844D0 = { name = "SelWinTask_vf01", size = 0x2C8 }
-0x82384798 = { name = "SelWinTask_vf02", size = 0x78 }
-0x82384810 = { name = "SelWinTask_vf03", size = 0x140 }
+0x82384458 = { name = "SelWinTask__Dtor", size = 0x74 }
+0x823844D0 = { name = "SelWinTask__Init", size = 0x2C8 }
+0x82384798 = { name = "SelWinTask__Update", size = 0x78 }
+0x82384810 = { name = "SelWinTask__Draw", size = 0x140 }
 0x82384BA8 = { name = "SvLdScrnTask_ctor", size = 0x210 }
 0x82384DB8 = { name = "SvLdScrnTask_dtor", size = 0x4C }
-0x82384E70 = { name = "SvLdScrnTask_vf01_Init", size = 0x2BC }
-0x82385130 = { name = "SvLdScrnTask_vf02_Update", size = 0x2FC }
+0x82384E70 = { name = "SvLdScrnTask__Init", size = 0x2BC }
+0x82385130 = { name = "SvLdScrnTask__Update", size = 0x2FC }
 0x82385430 = { name = "SvLdScrnTask_HandleCancel", size = 0x108 }
 0x82385538 = { name = "SvLdScrnTask_PopulateMenuItems", size = 0xD2C }
 0x82386268 = { name = "SvLdScrnTask_ShowPage", size = 0x140 }
 0x823864D8 = { name = "SvLdScrnTask_HideAndReset", size = 0xC8 }
-0x823865A0 = { name = "SvLdScrnTask_vf03_Draw", size = 0x39C }
+0x823865A0 = { name = "SvLdScrnTask__Draw", size = 0x39C }
 0x82386A30 = { name = "AnimeMenu_SetItemStringVar", size = 0x6C }
 0x82386AA0 = { name = "AnimeMenu_SetItemNarrowStringVar", size = 0x11C }
 0x82386BC0 = { name = "AnimeMenu_SetItemWideStringVar", size = 0x10C }
@@ -1132,20 +1144,20 @@
 0x8239BA30 = { name = "bdMinimapLoad", size = 0x1AC }
 0x8239C260 = { name = "MiniMapTask_LoadAreaFloors" }
 0x8239CD50 = { name = "bdWorldMapScreenTaskConstruct" }
-0x8239D3A0 = { name = "WorldMapScreenTask__vf02_Update", size = 0x29C }
-0x8239D640 = { name = "WorldMapScreenTask__vf03", size = 0xEC }
+0x8239D3A0 = { name = "MechattMap__MainTask__Update", size = 0x29C }
+0x8239D640 = { name = "MechattMap__MainTask__Draw", size = 0xEC }
 0x8239E478 = { name = "WorldMapScreen_ApplyReduceLayout" }
 0x8239EA00 = { name = "bdWorldMapInit", size = 0x218 }
 0x8239ED00 = { name = "bdWorldEnvInit", size = 0x4A8 }
 0x8239FCE8 = { name = "bdWorldMapPathBuild", size = 0xD0 }
 0x823A4000 = { name = "MapManTask__DebugDrawTriggers" }
-0x823AB810 = { name = "bd_Colli_Tree_vf00", size = 0x4C }
+0x823AB810 = { name = "bd__Colli__Tree__Dtor", size = 0x4C }
 0x823AE140 = { name = "bdPartyAddMember", size = 0xB4 }
 0x823AE678 = { name = "bdPartySetLeader", size = 0x450 }
 0x823B2270 = { name = "Player_RecalcParams" }
 0x823B2A08 = { name = "Player_CalcBattleParams" }
 0x823B3618 = { name = "Player_ApplyPassiveEffect" }
-0x823B4E40 = { name = "PlyTask__vf03", size = 0x1B8 }
+0x823B4E40 = { name = "PlyTask__Draw", size = 0x1B8 }
 0x823B6528 = { name = "AnimeData_method_6528", size = 0x218 }
 0x823B6F68 = { name = "Player_TickStatusEffects" }
 0x823B76D8 = { name = "Chara_FindClassSkill" }
@@ -1166,10 +1178,10 @@
 0x823F59E0 = { name = "bdEventSceneCreate", size = 0x1B8 }
 0x823F5CF8 = { name = "issEvent__dtor" }
 0x823F66E8 = { name = "bdEventSceneFileSetup", size = 0x180 }
-0x82405058 = { name = "Sequencer_ObjPath_vf00", size = 0x44 }
-0x824050A0 = { name = "Sequencer_Guid_vf00", size = 0x4C }
-0x824050F0 = { name = "Sequencer_Guid_vf02", size = 0x10 }
-0x82405100 = { name = "Sequencer_Move_vf00", size = 0x4C }
+0x82405058 = { name = "Sequencer__ObjPath__Dtor", size = 0x44 }
+0x824050A0 = { name = "Sequencer__Guid__Dtor", size = 0x4C }
+0x824050F0 = { name = "Sequencer__ObjPath__IsEmpty", size = 0x10 }
+0x82405100 = { name = "Sequencer__Move__Dtor", size = 0x4C }
 0x82407148 = { name = "bdIsSpecialCharModel", size = 0xF0 }
 0x824084B8 = { name = "AnimeData_method_84B8", size = 0xB4 }
 0x8240EBA8 = { name = "AnimeData_method_EBA8", size = 0x7D8 }
@@ -1182,12 +1194,12 @@
 0x82415670 = { name = "bdEventSceneSetupSoundEvents", size = 0x320 }
 0x824183B0 = { name = "bdEventSceneStartPlayback", size = 0x24C }
 0x8241D168 = { name = "Sequencer_ObjPath_dtor", size = 0x90 }
-0x8241D1F8 = { name = "Sequencer_Guid_vf03", size = 0x1D0 }
-0x8241D3C8 = { name = "Sequencer_Guid_vf01", size = 0x4 }
+0x8241D1F8 = { name = "Sequencer__Guid__BuildKeyframes", size = 0x1D0 }
+0x8241D3C8 = { name = "Sequencer__Guid__Interpolate", size = 0x4 }
 0x8241D3D0 = { name = "Sequencer_InterpolateKeyframes", size = 0x8CC }
 0x8241DCA0 = { name = "Sequencer_ObjPath_dtor_2", size = 0x90 }
-0x8241DD30 = { name = "Sequencer_Move_vf03", size = 0x1C8 }
-0x8241DEF8 = { name = "Sequencer_Move_vf01", size = 0x4 }
+0x8241DD30 = { name = "Sequencer__Move__BuildKeyframes", size = 0x1C8 }
+0x8241DEF8 = { name = "Sequencer__Move__Interpolate", size = 0x4 }
 0x8241DF00 = { name = "Sequencer_helper_DF00", size = 0x8C0 }
 0x82421198 = { name = "bdParticleEmit", size = 0x360 }
 0x82424200 = { name = "bdParticleCurveEval", size = 0xA4 }
@@ -1623,8 +1635,8 @@
 0x82473A78 = { name = "D3DDevice_SetGammaRamp_0" }
 0x8246A940 = { name = "D3DDevice_SetGammaRamp" }
 
-0x820C9990 = { name = "HddCacheTask__vf01" }
+0x820C9990 = { name = "HddCacheTask__Init" }
 0x8246CA50 = { name = "D3DTexture_LockRect" }
 0x8246CB18 = { name = "D3D__Lock2DSurface" }
 0x8246D408 = { name = "D3DLineTexture_LockRect" }
-0x82182498 = { name = "CRI__Sofdec__RenderTask__vf03" }
+0x82182498 = { name = "CRI__Sofdec__RenderTask__Draw" }

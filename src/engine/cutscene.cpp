@@ -64,8 +64,6 @@ struct MoviePlayer {
 };
 static_assert(offsetof(MoviePlayer, status) == 0x8C);
 
-// Loader's fade level for the loading icon. At zero, Loader::vf03 hides the
-// icon task at Loader+0x88 and draws neither it nor the fallback strip.
 constexpr u32 kLoaderIconFadeOffset = 0x84;
 
 // Index of the first live slot, or -1.
@@ -234,10 +232,6 @@ void bdMoviePlaybackHook(PPCRegister &r31) {
   bd::engine::OnMoviePresent(r31.u32);
 }
 
-// Loader::vf03, at the load of its fade level for the show/hide test. r31 = the
-// Loader. A movie streams the whole time it plays, so BD's IO-busy debounce
-// raises the loading icon over the top of it. Zeroing the fade takes BD's own
-// hide branch, and leaves the icon to fade back in normally afterwards.
 void bdLoaderIconMovieHideHook(PPCRegister &r31) {
   if (!bd::engine::SofdecMoviePlaying())
     return;

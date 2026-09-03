@@ -1,9 +1,3 @@
-# Frame interpolation and 30Hz gates (bodies in src/engine/frame_interp.cpp).
-# Active when bd_fps_limit > 30 or unlimited: each gate skips one fixed-step
-# accumulator store on interpolated frames, and the draws that follow re-read the
-# unchanged value.
-
-# Logic tick.
 [[midasm_hook]]
 address = 0x82126B78
 name = "bdLogicTickGateHook"
@@ -11,8 +5,6 @@ registers = ["r28"]
 after_instruction = false
 jump_address_on_true = 0x82126C20
 
-# Master 30Hz animation clock dword_82DC99C4 in bdFrameSubmit: skip its addi
-# (jump goes to the stw, rewriting the unchanged counter).
 [[midasm_hook]]
 address = 0x82134DB4
 name = "bdFrameClockGateHook"
@@ -20,7 +12,6 @@ registers = []
 after_instruction = false
 jump_address_on_true = 0x82134DB8
 
-# mcl::water_object::vf05 water time (this+0x1240) += 0.001; jump skips store + wrap block.
 [[midasm_hook]]
 address = 0x824543D4
 name = "bdShaderAnimGateHook"
@@ -28,7 +19,6 @@ registers = []
 after_instruction = false
 jump_address_on_true = 0x824543EC
 
-# mcl::effect_object::vf05 (also lightshaft) 8 UV scroll offsets += speed; jump to blr (body is accumulation only).
 [[midasm_hook]]
 address = 0x8221E594
 name = "bdShaderAnimGateHook"
@@ -36,7 +26,6 @@ registers = []
 after_instruction = false
 jump_address_on_true = 0x8221E614
 
-# mcl::cloud_object::vf05 2 UV drift offsets (this+0x122C..) += speed/256; skips both stores.
 [[midasm_hook]]
 address = 0x82453AA0
 name = "bdShaderAnimGateHook"
@@ -44,7 +33,6 @@ registers = []
 after_instruction = false
 jump_address_on_true = 0x82453AA8
 
-# mcl::caustics_object::vf05 caustics time (this+0x134C) += 0.001 (Pachess water cube, underwater floors); jump skips store + wrap block.
 [[midasm_hook]]
 address = 0x8245558C
 name = "bdShaderAnimGateHook"
@@ -52,8 +40,6 @@ registers = []
 after_instruction = false
 jump_address_on_true = 0x824555A4
 
-# StatusIconTex counter (this+0x20) in StatusIconTex__DrawAilmentIcons:
-# drives icon cycle /50, sine bob, fade alpha. Skips the addi only.
 [[midasm_hook]]
 address = 0x82433570
 name = "bdShaderAnimGateHook"
@@ -61,7 +47,6 @@ registers = []
 after_instruction = false
 jump_address_on_true = 0x82433574
 
-# CompassTask::vf03 needle angle (this+0x8C) += delta*0.05; jump skips store + 2pi-wrap store (draw reloads 0x8C, target uses pre-lerp f27).
 [[midasm_hook]]
 address = 0x8239CBC0
 name = "bdShaderAnimGateHook"
@@ -69,8 +54,6 @@ registers = []
 after_instruction = false
 jump_address_on_true = 0x8239CBE8
 
-# CompassTask::vf03 blink arm flag (this+0xA4) beq; on true forces the armed path so
-# the pulse alpha is recomputed on interpolated frames.
 [[midasm_hook]]
 address = 0x8239CBF4
 name = "bdCompassBlinkHoldHook"
@@ -78,7 +61,6 @@ registers = ["r11"]
 after_instruction = false
 jump_address_on_true = 0x8239CBF8
 
-# CompassTask::vf03 blink counter (this+0xA8, %30 alpha ramp); skips the addi only.
 [[midasm_hook]]
 address = 0x8239CC18
 name = "bdShaderAnimGateHook"
@@ -86,9 +68,6 @@ registers = []
 after_instruction = false
 jump_address_on_true = 0x8239CC1C
 
-# Loader::vf03 (0x82129380) "Now Loading" state machine: five gates step it at 30Hz,
-# the draw still runs every frame.
-# IO-busy debounce counter (this+0x7C) increment; r11 reloaded at loc_821295A0.
 [[midasm_hook]]
 address = 0x8212957C
 name = "bdShaderAnimGateHook"
@@ -96,7 +75,6 @@ registers = []
 after_instruction = false
 jump_address_on_true = 0x821295A0
 
-# IO-busy debounce counter (this+0x7C) decrement: skip addi+stw, same reload.
 [[midasm_hook]]
 address = 0x82129590
 name = "bdShaderAnimGateHook"
@@ -104,7 +82,6 @@ registers = []
 after_instruction = false
 jump_address_on_true = 0x821295A0
 
-# Shine-sweep counter (this+0x78): loading strip UV scroll + >=4 show threshold; skips addic+stw+clamp (cr0 only consumed by the skipped bge).
 [[midasm_hook]]
 address = 0x821295C0
 name = "bdShaderAnimGateHook"
@@ -112,7 +89,6 @@ registers = []
 after_instruction = false
 jump_address_on_true = 0x821295D0
 
-# Fade alpha (this+0x84) += 0.02 (fade in): skip store + 1.0 clamp (f0/cr6 recomputed after the reload at loc_82129660).
 [[midasm_hook]]
 address = 0x821295E4
 name = "bdShaderAnimGateHook"
@@ -120,7 +96,6 @@ registers = []
 after_instruction = false
 jump_address_on_true = 0x82129660
 
-# Fade alpha (this+0x84) -= 0.02 (fade out): skip store + 0.0 clamp, same reload.
 [[midasm_hook]]
 address = 0x82129650
 name = "bdShaderAnimGateHook"
@@ -128,8 +103,6 @@ registers = []
 after_instruction = false
 jump_address_on_true = 0x82129660
 
-# Gmk::IRSensor::vf14 (0x82321170) laser tripwire pulse phase (this+0x814) += 1 + rand()%1001*0.005;
-# jump to the epilogue skips the store (loop consumes the pre-increment phase).
 [[midasm_hook]]
 address = 0x82321360
 name = "bdShaderAnimGateHook"
@@ -137,12 +110,6 @@ registers = []
 after_instruction = false
 jump_address_on_true = 0x82321364
 
-# BattleViewTask::vf03 calls the previewed Chara's own Update (vtable+0xC,
-# Player__Update_vf03: bdAnimationUpdate, CharaVO__InvalidateAndSimulate, head
-# tracking) directly, once per rendered frame, then its Draw (vtable+0x10). All
-# of it is fixed-step, so above 30fps the model animates and simulates at
-# fps/30 speed. Gate the Update bctrl only; Draw keeps running every frame and
-# the following block reloads r11 and r3 from r31.
 [[midasm_hook]]
 address = 0x823E9388
 name = "bdShaderAnimGateHook"
@@ -150,10 +117,6 @@ registers = []
 after_instruction = false
 jump_address_on_true = 0x823E938C
 
-# BattleViewTask::vf03 (0x823E8F78) tail: the tool's own frame counter
-# (this+0x10C) += 1 per rendered frame, calibrated for 30Hz. It drives the
-# cursor tile size pulse (sin(n/30 * pi)) and the prompt text alpha blink
-# (sin(n/60 * pi)), so above 30fps both strobe. Skips the stfs only.
 [[midasm_hook]]
 address = 0x823E9764
 name = "bdShaderAnimGateHook"
@@ -161,10 +124,6 @@ registers = []
 after_instruction = false
 jump_address_on_true = 0x823E9768
 
-# PlyTask__vf03 player ambient recovery ramp: green/blue (obj+0xBC0/0xBC4) walk
-# toward white in 0.1 steps, one per call, from bdSceneNodeDraw. Guarded only by
-# green < 1.0, so it runs continuously wherever the area ambient darkens the
-# player. Jump to the join skips the whole ramp block.
 [[midasm_hook]]
 address = 0x823B4FB4
 name = "bdPlayerAmbientRampGateHook"
@@ -173,36 +132,11 @@ after_instruction = false
 jump_address_on_true = 0x823B4FDC
 
 [[midasm_hook]]
-address = 0x82280EFC
-name = "bdObjectPaletteInterpHook"
-registers = ["r4", "r5"]
-after_instruction = false
-
-[[midasm_hook]]
-address = 0x8227F79C
-name = "bdObjectPaletteInterpHook"
-registers = ["r4", "r5"]
-after_instruction = false
-
-[[midasm_hook]]
-address = 0x82282E34
-name = "bdObjectPaletteInterpHook"
-registers = ["r4", "r5"]
-after_instruction = false
-
-# Frozen-NPC portrait frost overlay: capture the bdPrimDrawRect2D args at the
-# Script__vf02 callsite each tick (f1/f2 = x/y, f4/f5 = w/h, r8 = color,
-# r30 = script+208 texture object) for replay on interpolated frames.
-[[midasm_hook]]
 address = 0x821AAD20
 name = "bdFaceFrostCaptureHook"
 registers = ["f1", "f2", "f4", "f5", "r8", "r30"]
 after_instruction = false
 
-# Floating item name label over a dropped item: capture the bdPushTextPrim args
-# at both Gmk__ItemDrop__vf13 callsites each tick (f1/f2 = x/y, f3 = z,
-# f4/f5 = scale, r8 = wide string, r9 = color, r10 = mode) for replay on
-# interpolated frames. Shadow pass.
 [[midasm_hook]]
 address = 0x822FC280
 name = "bdItemDropTextCaptureHook"
@@ -210,7 +144,6 @@ registers = ["f1", "f2", "f3", "f4", "f5", "r8", "r9", "r10"]
 after_instruction = false
 jump_address_on_true = 0x822FC284
 
-# Main text pass, same string, white with the fade alpha in the high byte.
 [[midasm_hook]]
 address = 0x822FC2AC
 name = "bdItemDropTextCaptureHook"
@@ -218,9 +151,6 @@ registers = ["f1", "f2", "f3", "f4", "f5", "r8", "r9", "r10"]
 after_instruction = false
 jump_address_on_true = 0x822FC2B0
 
-# Re-issue the captured label on interpolated frames, immediately before
-# bdFrameSubmit's bdPrimFlush call so the prims join this frame's 2D pass and
-# precede the Visual::Tag slot flip that follows it.
 [[midasm_hook]]
 address = 0x82134144
 name = "bdItemDropTextReplayHook"
@@ -243,4 +173,186 @@ after_instruction = false
 address = 0x8227DBB8
 name = "bdAlphaPrimCaptureHook"
 registers = ["r3"]
+after_instruction = false
+
+[[midasm_hook]]
+address = 0x821681D4
+name = "bdCharaBoneChainGateHook"
+registers = ["r3"]
+after_instruction = false
+jump_address_on_true = 0x821681D8
+
+[[midasm_hook]]
+address = 0x821C29E8
+name = "bdShaderAnimGateHook"
+registers = []
+after_instruction = false
+jump_address_on_true = 0x821C2A54
+
+[[midasm_hook]]
+address = 0x821C2A20
+name = "bdShaderAnimGateHook"
+registers = []
+after_instruction = false
+jump_address_on_true = 0x821C2A54
+
+[[midasm_hook]]
+address = 0x82381030
+name = "bdShaderAnimGateHook"
+registers = []
+after_instruction = false
+jump_address_on_true = 0x82381034
+
+[[midasm_hook]]
+address = 0x82380610
+name = "bdShaderAnimGateHook"
+registers = []
+after_instruction = false
+jump_address_on_true = 0x82380614
+
+[[midasm_hook]]
+address = 0x822062B0
+name = "bdShaderAnimGateHook"
+registers = []
+after_instruction = false
+jump_address_on_true = 0x822062C8
+
+[[midasm_hook]]
+address = 0x822062DC
+name = "bdShaderAnimGateHook"
+registers = []
+after_instruction = false
+jump_address_on_true = 0x822062F8
+
+[[midasm_hook]]
+address = 0x821A1384
+name = "bdShaderAnimGateHook"
+registers = []
+after_instruction = false
+jump_address_on_true = 0x821A1398
+
+[[midasm_hook]]
+address = 0x821A13A8
+name = "bdShaderAnimGateHook"
+registers = []
+after_instruction = false
+jump_address_on_true = 0x821A13B4
+
+[[midasm_hook]]
+address = 0x82129448
+name = "bdShaderAnimGateHook"
+registers = []
+after_instruction = false
+jump_address_on_true = 0x82129450
+
+[[midasm_hook]]
+address = 0x821294C4
+name = "bdShaderAnimGateHook"
+registers = []
+after_instruction = false
+jump_address_on_true = 0x821294C8
+
+[[midasm_hook]]
+address = 0x821C2E00
+name = "bdShaderAnimGateHook"
+registers = []
+after_instruction = false
+jump_address_on_true = 0x821C2E08
+
+[[midasm_hook]]
+address = 0x821C2E20
+name = "bdShaderAnimGateHook"
+registers = []
+after_instruction = false
+jump_address_on_true = 0x821C2E54
+
+[[midasm_hook]]
+address = 0x82355000
+name = "bdShaderAnimGateHook"
+registers = []
+after_instruction = false
+jump_address_on_true = 0x82355018
+
+[[midasm_hook]]
+address = 0x8216FAF8
+name = "bdShaderAnimGateHook"
+registers = []
+after_instruction = false
+jump_address_on_true = 0x8216FB00
+
+[[midasm_hook]]
+address = 0x821511E4
+name = "bdShaderAnimGateHook"
+registers = []
+after_instruction = false
+jump_address_on_true = 0x82151270
+
+[[midasm_hook]]
+address = 0x82406EEC
+name = "bdEvtObjectHideDeferHook"
+registers = ["r31"]
+after_instruction = false
+jump_address_on_true = 0x82406EF4
+
+[[midasm_hook]]
+address = 0x824107D4
+name = "bdEvtActorHideDeferHook"
+registers = ["r31"]
+after_instruction = false
+jump_address_on_true = 0x824107DC
+
+[[midasm_hook]]
+address = 0x82440AC4
+name = "bdShaderAnimGateHook"
+registers = []
+after_instruction = false
+jump_address_on_true = 0x82440AD8
+
+[[midasm_hook]]
+address = 0x82463FFC
+name = "bdShaderAnimGateHook"
+registers = []
+after_instruction = false
+jump_address_on_true = 0x82464008
+
+[[midasm_hook]]
+address = 0x82437598
+name = "bdActEvClockMismatchHook"
+registers = ["r11"]
+after_instruction = false
+
+[[midasm_hook]]
+address = 0x824394C0
+name = "bdActEvClockMismatchHook"
+registers = ["r11"]
+after_instruction = false
+
+[[midasm_hook]]
+address = 0x8243BFEC
+name = "bdActEvClockMismatchHook"
+registers = ["r11"]
+after_instruction = false
+
+[[midasm_hook]]
+address = 0x82435634
+name = "bdActEvClockMismatchHook"
+registers = ["r11"]
+after_instruction = false
+
+[[midasm_hook]]
+address = 0x8243DCFC
+name = "bdActEvClockMismatchHook"
+registers = ["r11"]
+after_instruction = false
+
+[[midasm_hook]]
+address = 0x824407A0
+name = "bdActEvClockMismatchHook"
+registers = ["r11"]
+after_instruction = false
+
+[[midasm_hook]]
+address = 0x82442E6C
+name = "bdActEvClockMismatchHook"
+registers = ["r11"]
 after_instruction = false

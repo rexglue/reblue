@@ -17,8 +17,8 @@ namespace bd::engine {
 namespace {
 
 constexpr double kTick = 1.0 / 30.0;
-constexpr double kMaxDelta = 1.0 / 15.0;
-constexpr int kMaxTicksPerIter = 4;
+constexpr double kMaxReportedDelta = 1.0 / 15.0;
+constexpr double kMaxBacklog = kTick * 4.0;
 
 using Clock = std::chrono::steady_clock;
 
@@ -47,32 +47,27 @@ bool InterpolationActive() {
 
 void Advance() {
   const double now = NowSeconds();
-  double dt = (g_lastTime > 0.0) ? (now - g_lastTime) : kTick;
+  const double dt =
+      (g_lastTime > 0.0) ? std::max(now - g_lastTime, 0.0) : kTick;
   g_lastTime = now;
-  dt = std::clamp(dt, 0.0, kMaxDelta);
-  g_lastDelta = dt;
+  g_lastDelta = std::min(dt, kMaxReportedDelta);
 
-  int ticks = 1;
   if (!InterpolationActive()) {
     g_tickDue = true;
     g_alpha = 0.0f;
     g_accum = 0.0;
   } else {
-    g_accum += dt;
-    ticks = 0;
-    while (g_accum >= kTick && ticks < kMaxTicksPerIter) {
+    g_accum = std::min(g_accum + dt, kMaxBacklog);
+    g_tickDue = g_accum >= kTick;
+    if (g_tickDue)
       g_accum -= kTick;
-      ++ticks;
-    }
-    if (ticks == kMaxTicksPerIter) {
-      g_accum = 0.0;
-    }
-    g_tickDue = ticks > 0;
     g_alpha = static_cast<float>(std::clamp(g_accum / kTick, 0.0, 0.9999));
   }
 
-  g_tickCount += ticks;
-  g_tpsTicks += ticks;
+  if (g_tickDue) {
+    ++g_tickCount;
+    g_tpsTicks += 1.0;
+  }
   g_tpsSeconds += dt;
   if (g_tpsSeconds >= kTpsWindow) {
     g_tps = g_tpsTicks / g_tpsSeconds;
@@ -81,11 +76,41 @@ void Advance() {
   }
 }
 
-bool TickDue() { return g_tickDue; }
-float Alpha() { return InterpolationActive() ? g_alpha : 0.0f; }
-u64 TickCount() { return g_tickCount; }
+namespace {
+
+struct RenderClock {
+  double time = 0.0;
+  double delta = kTick;
+  float alpha = 0.0f;
+  bool tickDue = true;
+  u64 tick = 0;
+};
+RenderClock g_render;
+thread_local bool t_renderThread = false;
+
+} // namespace
+
+void PublishRenderClock() {
+  if (t_renderThread)
+    return;
+  g_render.time = g_lastTime;
+  g_render.delta = g_lastDelta;
+  g_render.alpha = g_alpha;
+  g_render.tickDue = g_tickDue;
+  g_render.tick = g_tickCount;
+}
+
+void BindRenderThread() { t_renderThread = true; }
+
+bool TickDue() { return t_renderThread ? g_render.tickDue : g_tickDue; }
+float Alpha() {
+  if (!InterpolationActive())
+    return 0.0f;
+  return t_renderThread ? g_render.alpha : g_alpha;
+}
+u64 TickCount() { return t_renderThread ? g_render.tick : g_tickCount; }
 double TicksPerSecond() { return g_tps; }
-double FrameTime() { return g_lastTime; }
-double FrameDelta() { return g_lastDelta; }
+double FrameTime() { return t_renderThread ? g_render.time : g_lastTime; }
+double FrameDelta() { return t_renderThread ? g_render.delta : g_lastDelta; }
 
 } // namespace bd::engine

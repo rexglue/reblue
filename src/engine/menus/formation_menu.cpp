@@ -22,8 +22,7 @@
 #include "engine/state_layout.h"
 #include "reblue_init.h"
 
-// Camp::Rank::MainTask::vf02 is the formation screen's own input handler.
-REX_EXTERN(__imp__Camp__Rank__MainTask__vf02);
+REX_EXTERN(__imp__Camp__Rank__MainTask__Update);
 REX_IMPORT(__imp__CampRank_UpdateCursorPosName, RankUpdateCursorPosName, u32(u32));
 REX_IMPORT(__imp__CampRank_ApplySlotUVs, RankApplySlotUVs, u32(u32));
 REX_IMPORT(__imp__bdInputCheckDpadRight, RankPadRight, u32());
@@ -64,9 +63,6 @@ struct AnimePosVar_t {
 };
 static_assert(sizeof(AnimePosVar_t) == 0x18);
 
-// Camp::Rank::MainTask, laid out by bdCampRankConstruct (0x822E6978) and filled
-// in by its vf01 (0x822E6C68), which copies the loaded L_rnk0N.csv's ten
-// '<cell>PltPos' variables into cellPos.
 struct RankTask_t {
   /* 0x0000 */ u8 _pad0000[0x6C];
   /* 0x006C */ be_u32 phase;
@@ -221,8 +217,8 @@ void HoverFormationCells(u32 taskVA) {
 
 } // namespace bd::engine
 
-REX_HOOK_RAW(Camp__Rank__MainTask__vf02) {
+REX_HOOK_RAW(Camp__Rank__MainTask__Update) {
   const u32 taskVA = ctx.r3.u32;
   bd::engine::HoverFormationCells(taskVA);
-  __imp__Camp__Rank__MainTask__vf02(ctx, base);
+  __imp__Camp__Rank__MainTask__Update(ctx, base);
 }

@@ -39,8 +39,8 @@
 
 REX_IMPORT(__imp__AnimeVarBag_FindChildByName, VarBagFindChild, u32(u32, u32));
 
-REX_EXTERN(__imp__WorldMapScreenTask__vf02_Update);
-REX_EXTERN(__imp__WorldMapScreenTask__vf03);
+REX_EXTERN(__imp__MechattMap__MainTask__Update);
+REX_EXTERN(__imp__MechattMap__MainTask__Draw);
 REX_EXTERN(__imp__WorldMapScreen_ApplyReduceLayout);
 
 namespace bd::engine {
@@ -360,16 +360,6 @@ void AreaMap::ApplyScreenVars(bool areaMap) {
   }
 }
 
-// One task per marker, all parented to the screen, so one walk of the child
-// list reaches every one. Both layouts stay, since their frame, header and
-// footer are the chrome the area map keeps.
-//
-// Clearing the visible flag on the fade layout would deadlock the screen:
-// vf03 raises drawDirty and vf02 only advances the timeline when it is raised,
-// so an invisible task never reports finished and WorldMapScreenTask__vf02
-// waits on that to leave the transition. Writing the flag rather than calling
-// SetVisibleAndPlay leaves each marker's timeline where it was, so nothing
-// replays its intro on the way back.
 void AreaMap::HideVanillaAnime() {
   hidden_.clear();
   const u32 screen = screen_.Address();
@@ -769,16 +759,16 @@ void AreaMapTick() {
 // The hooks stay raw: they call guest code on the hook's own stack, which
 // only ctx carries.
 
-REX_HOOK_RAW(WorldMapScreenTask__vf02_Update) {
+REX_HOOK_RAW(MechattMap__MainTask__Update) {
   const u32 screenTask = ctx.r3.u32;
   if (bd::engine::AreaMap::Get().Update(screenTask))
     return;
-  __imp__WorldMapScreenTask__vf02_Update(ctx, base);
+  __imp__MechattMap__MainTask__Update(ctx, base);
 }
 
-REX_HOOK_RAW(WorldMapScreenTask__vf03) {
+REX_HOOK_RAW(MechattMap__MainTask__Draw) {
   const u32 screenTask = ctx.r3.u32;
-  __imp__WorldMapScreenTask__vf03(ctx, base);
+  __imp__MechattMap__MainTask__Draw(ctx, base);
   bd::engine::AreaMap::Get().Draw(screenTask);
 }
 

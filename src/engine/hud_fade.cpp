@@ -149,9 +149,6 @@ void bdMiniMapLayerFadeHook(PPCRegister &r31) { ScaleHudColor(r31); }
 void bdPartyCardFadeHook(PPCRegister &r29) {
   const u32 task = r29.u32;
 
-  // A town has neither a compass nor a minimap, so the cards are all that can
-  // report the HUD on screen. The visible flag rather than this hook running,
-  // since vf02 keeps updating through a hide.
   const u32 anime = bd::mem::load<u32>(task + kSimpleStatus_Anime);
   const bool shown =
       anime && bd::mem::load<u32>(anime + kAnime_Visible) != 0 &&

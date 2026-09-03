@@ -26,8 +26,6 @@ constexpr u32 kScaOp_Group = 0x10;
 constexpr u32 kScaGroupTutorial = 2;
 constexpr u32 kScaGroupMinigameTutorial = 3;
 
-// Script__vf02 writes this to its forced-tutorial state once the sequence has
-// played out.
 constexpr u32 kSkillTutorialDone = 0xFFFFFFFF;
 
 bool TutorialsOff() { return bd::engine::Settings::Get().DisableTutorials(); }

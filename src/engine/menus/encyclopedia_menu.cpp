@@ -203,9 +203,6 @@ bool bdEncyclopediaAchievementsDispatchHook(PPCRegister &r3, PPCRegister &r4) {
   if (r3.u32 != kAchievementsEntryId)
     return false;
 
-  // Opened here rather than from the next frame's update hook: the transition
-  // runs Exit(1) before this call returns, which hides the top screen.
-  // s_enc_task was refreshed by the update hook earlier in this same vf02 call.
   if (s_enc_task) {
     s_ach_menu.Create(s_enc_task.Address());
     // Our own transition redraws all six rows itself.

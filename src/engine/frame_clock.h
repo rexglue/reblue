@@ -13,27 +13,23 @@
 
 namespace bd::engine {
 
-// Advance the tick clock. Called once per bdMainGameStep iteration, before the
-// guest's logic block.
 void Advance();
 
 bool InterpolationActive();
 
-// True when this iteration should execute BD's 30Hz logic block.
-// Always true when interpolation is inactive.
 bool TickDue();
 
-// Interpolation phase in [0,1): fraction of the current tick elapsed.
 float Alpha();
 
-// Monotonic count of logic ticks issued.
 u64 TickCount();
 
-// Smoothed measured logic tick rate, for the F3 overlay.
 double TicksPerSecond();
 
 double FrameTime();
 
 double FrameDelta();
+
+void PublishRenderClock();
+void BindRenderThread();
 
 } // namespace bd::engine

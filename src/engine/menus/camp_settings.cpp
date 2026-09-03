@@ -16,7 +16,7 @@
 #include "engine/sfx.h"
 #include "engine/menus/config_menu_data.h"
 
-REX_EXTERN(__imp__Camp__Config__MainTask__vf02);
+REX_EXTERN(__imp__Camp__Config__MainTask__Update);
 REX_IMPORT(__imp__bdCampConfigSetState, CampConfigSetState, u32(u32, u32));
 
 namespace bd::engine {
@@ -147,7 +147,7 @@ void CampSettings::Tick() {
   config_.Reset();
   RegisterVFS(ConfigMenu::Surface::InGame);
   menu_.Create(camp, ConfigMenu::Surface::InGame,
-               &__imp__Camp__Config__MainTask__vf02);
+               &__imp__Camp__Config__MainTask__Update);
   if (!menu_.IsActive())
     UnregisterVFS();
 }
@@ -255,9 +255,9 @@ bool CampSettings::Update(PPCContext &ctx, u8 *base, u32 taskAddr) {
 
 } // namespace bd::engine
 
-REX_HOOK_RAW(Camp__Config__MainTask__vf02) {
+REX_HOOK_RAW(Camp__Config__MainTask__Update) {
   const u32 task = ctx.r3.u32;
   if (bd::engine::CampSettings::Get().Update(ctx, base, task))
     return;
-  __imp__Camp__Config__MainTask__vf02(ctx, base);
+  __imp__Camp__Config__MainTask__Update(ctx, base);
 }

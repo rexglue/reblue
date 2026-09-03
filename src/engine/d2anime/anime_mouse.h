@@ -29,7 +29,6 @@ public:
   // From the AnimeMenu_Update hook, once per live menu per frame. No guest
   // calls, no mutation.
   void Observe(u32 menuVA);
-  // The same, from the CommandSelectTask::vf02 hook.
   void ObserveCommandSelect(u32 taskVA);
 
   // Once per guest frame from bdInputSystemUpdate. Publishes whether a menu is

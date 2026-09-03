@@ -270,10 +270,6 @@ void SelectAllRows(u32 menuVA) {
 
 } // namespace bd::engine
 
-// The field encounter menu's per-frame update, called from
-// ScriptManTask::vf02 for as long as the menu is up. It polls the pad itself,
-// so running ahead of it leaves the cursor already moved when it reads the
-// confirm button. r3 is the party front entity carrying the menu.
 REX_HOOK_RAW(bdFieldEncounterMenuUpdate) {
   bd::engine::DriveEncounterMouse(ctx.r3.u32);
   __imp__bdFieldEncounterMenuUpdate(ctx, base);

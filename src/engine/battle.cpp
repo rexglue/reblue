@@ -68,11 +68,6 @@ constexpr u32 kBM_CurActor = 560;    // 0x230 current actor task*
 
 constexpr u32 kLoadStateLoaded = 0;
 
-// ScriptManTask::vf02 runs a 12-state machine off this field. State 8 fades
-// out and hands over to state 9, which draws the GAME OVER logo from the
-// gmov_logo_xx list vf01_Init built and sits there waiting for A or B. Only
-// that button press goes on to build the PreRestartTask, so the state, not the
-// task, is what catches a game over the player never dismisses.
 constexpr u32 kBattleSys_State = 0x6A0;
 constexpr u32 kBattleStateGameOver = 9;
 
@@ -225,9 +220,6 @@ REX_HOOK_RAW(bdBattleSceneUpdate) {
   __imp__bdBattleSceneUpdate(ctx, base);
 }
 
-// BattleTask::vf01, which builds the BattleCameraTask that
-// addr::kBattleCameraCtl holds and Battle::IsActive() answers from. It leaves a
-// surviving one alone, so the publish rides the transition, not the call.
 REX_EXTERN(__imp__bdBattleDataLoad);
 REX_HOOK_RAW(bdBattleDataLoad) {
   const bool wasActive = bd::engine::Battle{}.IsActive();
@@ -246,10 +238,10 @@ void bdBattleCameraDestroyHook() {
 // Mirrors the battle state machine after each update, so the GAME OVER screen
 // is caught the frame it comes up. The scene is taken from r3 first because the
 // original returns over it.
-REX_EXTERN(__imp__ScriptManTask__vf02_Update);
-REX_HOOK_RAW(ScriptManTask__vf02_Update) {
+REX_EXTERN(__imp__ScriptManTask__Update);
+REX_HOOK_RAW(ScriptManTask__Update) {
   const u32 scene = ctx.r3.u32;
-  __imp__ScriptManTask__vf02_Update(ctx, base);
+  __imp__ScriptManTask__Update(ctx, base);
   const bool gameOver =
       bd::mem::try_field<u32>(scene, bd::engine::kBattleSys_State) ==
       bd::engine::kBattleStateGameOver;
