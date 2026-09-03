@@ -220,11 +220,6 @@ void DrainSlot(VideoState &s, u32 slot) {
   }
 }
 
-// Awaits the newly current slot's fence if it has in-flight work (one frame
-// old), rewinds its upload chunks and repoints the recording alias. Caller
-// holds
-// s.mutex, and the matching DrainSlot runs after it drops. At kNumFrames=1 the
-// reused slot is the one just submitted, giving the full-frame stall.
 void AdvanceAndWaitReused(VideoState &s) {
   const u32 slot = s.next_frame;
   // Opens the unsafe-to-retire window, closed by DrainSlot's entry clear. A

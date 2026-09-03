@@ -54,6 +54,10 @@ plume::RenderFramebuffer *GetFramebuffer(VideoState &s, GuestTexture *rt,
     return nullptr;
   }
   auto *raw = fb.get();
+  if (rt)
+    rt->framebufferAttached = true;
+  if (ds)
+    ds->framebufferAttached = true;
   container->framebuffers.emplace(key, std::move(fb));
   s.framebuffer_owners.insert(container);
   return raw;

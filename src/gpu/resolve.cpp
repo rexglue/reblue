@@ -259,6 +259,7 @@ bool CopySurfaceToTextureLocked(VideoState &s, GuestTexture *src,
         return false;
       }
       dst_fb = fb.get();
+      dst->framebufferAttached = true;
       dst->framebuffers.emplace(fb_key, std::move(fb));
       s.framebuffer_owners.insert(dst);
     }
@@ -374,6 +375,7 @@ bool ClearDepthTargetToFarLocked(VideoState &s, GuestTexture *dst) {
     if (!fb)
       return false;
     dst_fb = fb.get();
+    dst->framebufferAttached = true;
     dst->framebuffers.emplace(kDepthFbKey, std::move(fb));
     s.framebuffer_owners.insert(dst);
   }
@@ -465,7 +467,7 @@ void MaterializeInboundLocked(VideoState &s, GuestTexture *dst) {
 // >40% off and stays out.
 bool FullscreenChainClassLocked(const VideoState &s, const GuestTexture *t) {
   const GuestTexture *bb = s.back_buffer_surface;
-  if (!t || !bb || t == bb || IsDepthFormat(t->format))
+  if (!t || !bb || t == bb || IsDepthFormat(t->format) || t->reflection)
     return false;
   // Cutscenes render the whole chain at the design width even under a wider
   // backbuffer, so the gate is min(bb width, design width). The bloom pyramid

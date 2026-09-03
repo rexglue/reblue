@@ -103,6 +103,8 @@ struct GuestTexture {
   // consumed, so the lazy resolve alias no longer holds and ResolveRtToTexture
   // must eager-copy. Set per TrackResolveSource.
   bool resolveSourceFallback = false;
+  bool reflection = false;
+  bool framebufferAttached = false;
   // Per-(depth attachment) framebuffer cache. Keyed by depth texture pointer,
   // where a nullptr key is a color-only pass.
   std::unordered_map<const plume::RenderTexture *,

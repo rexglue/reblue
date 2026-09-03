@@ -173,7 +173,7 @@ void DrainPooledSurfaceReturns(VideoState &s, u32 slot) {
 // command list. Parked pool surfaces stay in framebuffer_owners so the walk
 // reaches them.
 void RetireTextureBindingsLocked(VideoState &s, GuestTexture *dead) {
-  {
+  if (dead->framebufferAttached) {
     BD_CPU_ZONE("FbCacheInvalidate");
     const plume::RenderTexture *deadTex = dead->texture;
     for (auto it = s.framebuffer_owners.begin();
