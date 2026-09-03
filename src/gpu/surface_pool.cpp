@@ -49,6 +49,7 @@ constexpr u64 kAutoBudgetMin = 512ull * 1024 * 1024;
 constexpr u64 kAutoBudgetMax = 4096ull * 1024 * 1024;
 constexpr u64 kAutoBudgetNum = 1;
 constexpr u64 kAutoBudgetDen = 4;
+constexpr u64 kBudgetCapPercent = 50;
 // A key acquired this recently is live working set: its last parked copy is not
 // spare capacity, since dropping it buys a guaranteed recreate next frame. Well
 // above one frame's churn (~20-35 parks).
@@ -145,18 +146,12 @@ u64 VramBytes(Pool &p) {
 // A share of a card whose size is unknown is unanswerable, so UMA and the
 // pre-device calls take the floor rather than a guess at what it may hold.
 u64 ByteBudget(Pool &p) {
-  const u64 vram = VramBytes(p);
-  const i32 pct = Settings::Get().SurfacePoolBudgetPercent();
-  if (pct > 0) {
-    if (!vram)
-      return kAutoBudgetMin;
-    return vram / 100 * u64(pct);
-  }
   if (p.auto_budget_bytes)
     return p.auto_budget_bytes;
 
+  const u64 vram = VramBytes(p);
   if (!vram)
-    return kAutoBudgetMin; // UMA, or the device is not up yet
+    return kAutoBudgetMin;
   p.auto_budget_bytes = std::clamp(vram / kAutoBudgetDen * kAutoBudgetNum,
                                    kAutoBudgetMin, kAutoBudgetMax);
   BD_INFO("[surface-pool] auto budget {} MiB from {} MiB VRAM ({})",
@@ -170,7 +165,7 @@ u64 HardCeiling(Pool &p, u64 budget) {
   const u64 vram = VramBytes(p);
   if (!vram)
     return budget * 2;
-  return std::max(budget, vram / 100 * u64(kSurfacePoolBudgetCapPercent));
+  return std::max(budget, vram / 100 * kBudgetCapPercent);
 }
 
 KeyStats &TouchKeyLocked(Pool &p, u64 key, u32 width, u32 height,
@@ -368,17 +363,13 @@ bool ReturnLocked(GuestTexture *surface, std::vector<GuestTexture *> &evicted) {
   while ((p.parked_bytes + ks.bytes > budget || p.free_count >= kCountCap) &&
          EvictVictimLocked(p, key, evicted, /*allow_hot=*/false)) {
   }
-  // What is left is the live set, re-acquired next frame whether the pool keeps
-  // it or not, so evicting only moves the cost into a fresh committed alloc: a
-  // 4K 4x-SSAA scene surface takes half a second to recreate.
   const u64 ceiling = HardCeiling(p, budget);
   if (p.parked_bytes + ks.bytes > budget) {
     static std::atomic<u32> s_warn{0};
     if (s_warn.fetch_add(1, std::memory_order_relaxed) < 4) {
       BD_WARN("SurfacePool: live working set {:.0f} MiB over the {} MiB "
-              "budget, holding it parked (ceiling {} MiB). Lower the AA "
-              "factor or shadow resolution, or raise "
-              "bd_surface_pool_budget_pct.",
+              "budget, holding it parked (ceiling {} MiB). Lower "
+              "supersampling or MSAA, or shadow resolution.",
               (p.parked_bytes + ks.bytes) / 1048576.0, budget / 1048576,
               ceiling / 1048576);
     }
@@ -416,6 +407,7 @@ void ResetPooled(GuestTexture *pooled, u32 guest_format, bool is_depth) {
   pooled->surfaceDrawn = false;
   pooled->pendingDestroy = false;
   pooled->pendingGPURead = false;
+  pooled->reflection = false;
   pooled->layout = plume::RenderTextureLayout::UNKNOWN;
   pooled->guestFormat = guest_format;
   if (pooled->texture && !is_depth) {

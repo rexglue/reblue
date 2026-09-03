@@ -29,7 +29,6 @@ REXCVAR_DECLARE(i32, bd_aspect_ratio);
 REXCVAR_DECLARE(i32, bd_fov_offset);
 REXCVAR_DECLARE(bool, bd_vsync);
 REXCVAR_DECLARE(i32, bd_diag_verbosity);
-REXCVAR_DECLARE(i32, bd_surface_pool_budget_pct);
 
 REXCVAR_DEFINE_BOOL(bd_pso_precache, true, kCvarGroup,
                     "Precompile pipelines during loads instead of at first "
@@ -133,12 +132,6 @@ REXCVAR_DEFINE_INT32(bd_diag_verbosity, 0, kCvarGroup,
                      "diagnostics, 2 per-frame telemetry.")
     .range(0, 2);
 
-REXCVAR_DEFINE_INT32(bd_surface_pool_budget_pct, 0, kCvarGroup,
-                     "Percent of adapter VRAM the render-target pool may hold "
-                     "parked. 0 = auto (three eighths of it). Lower trades "
-                     "allocation hitches for VRAM headroom.")
-    .range(0, bd::gpu::kSurfacePoolBudgetCapPercent);
-
 namespace bd::gpu {
 namespace {
 
@@ -201,9 +194,6 @@ void Settings::AdoptGeometryGPUUpload() {
   geometryGPUUpload_ = REXCVAR_GET(bd_geometry_gpu_upload);
 }
 void Settings::AdoptDRED() { dred_ = REXCVAR_GET(bd_dred); }
-void Settings::AdoptSurfacePoolBudgetPercent() {
-  surfacePoolBudgetPercent_ = REXCVAR_GET(bd_surface_pool_budget_pct);
-}
 void Settings::AdoptSuperSampling() {
   superSampling_ = REXCVAR_GET(bd_supersampling);
 }
@@ -230,10 +220,6 @@ bool Settings::SetShadowQuality(f64 distance, i32 dimension) {
   const bool dim =
       rex::cvar::SetFlagByName("bd_shadow_dimension", FormatCvar(dimension));
   return dist && dim;
-}
-
-bool Settings::SetSurfacePoolBudgetPercent(i32 v) {
-  return rex::cvar::SetFlagByName("bd_surface_pool_budget_pct", FormatCvar(v));
 }
 
 bool Settings::SetVsync(bool v) {
@@ -313,7 +299,6 @@ void Settings::AdoptCvars() {
   AdoptPSOPrecache();
   AdoptGeometryGPUUpload();
   AdoptDRED();
-  AdoptSurfacePoolBudgetPercent();
   AdoptSuperSampling();
   AdoptMSAA();
 }
@@ -339,7 +324,6 @@ void Settings::Init() {
   reg("bd_pso_precache", &Settings::AdoptPSOPrecache);
   reg("bd_geometry_gpu_upload", &Settings::AdoptGeometryGPUUpload);
   reg("bd_dred", &Settings::AdoptDRED);
-  reg("bd_surface_pool_budget_pct", &Settings::AdoptSurfacePoolBudgetPercent);
   reg("bd_supersampling", &Settings::AdoptSuperSampling);
   reg("bd_msaa", &Settings::AdoptMSAA);
 }

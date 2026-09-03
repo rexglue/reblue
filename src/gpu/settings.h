@@ -23,12 +23,6 @@ enum class AspectMode : i32 {
   Stretch = 6,
 };
 
-// The most of adapter VRAM the render-target pool may hold parked. Past this
-// the pool stops holding its live working set anyway, and the frame's own
-// allocations need the rest of the card, so it is both what the menu offers as
-// Max and where the setting's own range stops.
-inline constexpr i32 kSurfacePoolBudgetCapPercent = 50;
-
 // The field of view the game frames itself at, horizontal degrees at 16:9.
 // bdCameraInit seeds every camera with 3*pi/20 of vertical view, 27 degrees,
 // which is this across that ratio. bd_fov_offset moves off it, and 0 keeps it.
@@ -123,12 +117,6 @@ public:
   bool PSOPrecache() const { return psoPrecache_; }
   bool GeometryGPUUpload() const { return geometryGPUUpload_; }
   bool DRED() const { return dred_; }
-  // Percent of adapter VRAM the render-target pool may hold parked, capped at
-  // kSurfacePoolBudgetCapPercent. 0 = auto, which the pool sizes itself. Read
-  // on every park, so a change takes effect at once.
-  i32 SurfacePoolBudgetPercent() const { return surfacePoolBudgetPercent_; }
-  bool SetSurfacePoolBudgetPercent(i32 v);
-
   i32 SuperSampling() const { return superSampling_; }
   bool SetSuperSampling(i32 v);
   i32 MSAA() const { return msaa_; }
@@ -158,7 +146,6 @@ private:
   void AdoptPSOPrecache();
   void AdoptGeometryGPUUpload();
   void AdoptDRED();
-  void AdoptSurfacePoolBudgetPercent();
   void AdoptSuperSampling();
   void AdoptMSAA();
 
@@ -175,7 +162,6 @@ private:
   bool psoPrecache_ = true;
   bool geometryGPUUpload_ = true;
   bool dred_ = true;
-  i32 surfacePoolBudgetPercent_ = 0;
   i32 diagVerbosity_ = 2;
 };
 

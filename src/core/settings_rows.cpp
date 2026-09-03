@@ -223,21 +223,6 @@ constexpr SettingOption kPresetOpts[] = {
      .num = 4,
      .key = gpu::ToString(gpu::QualityPreset::Custom)}};
 
-// How much of the card the render-target pool may hold parked between frames.
-// A share rather than a size, so one setting means the same thing on a 6 GiB
-// card and a 24 GiB one. Auto sizes itself off the adapter, and Max is the
-// cap: past it the pool drops its live working set anyway, so no step above
-// it would buy anything.
-constexpr SettingOption kVramBudget[] = {
-    {.text = "Auto", .num = 0, .key = "opt.auto"},
-    {.text = "10%", .num = 10},
-    {.text = "20%", .num = 20},
-    {.text = "30%", .num = 30},
-    {.text = "40%", .num = 40},
-    {.text = "Max",
-     .num = gpu::kSurfacePoolBudgetCapPercent,
-     .key = "opt.max"}};
-
 template <size_t N> constexpr int OptCount(const SettingOption (&)[N]) {
   return static_cast<int>(N);
 }
@@ -657,21 +642,6 @@ constexpr SettingRow kGraphicsSettings[] = {
      .smax = 100.0,
      .sstep = 5.0,
      .sfmt = "%.0f%%"},
-    {.label = "settings.graphics.vram_budget.label",
-     .group = "menu.header.memory",
-     .binding = {.get =
-                     [] {
-                       return static_cast<double>(
-                           gpu::Settings::Get().SurfacePoolBudgetPercent());
-                     },
-                 .set =
-                     [](double v) {
-                       return gpu::Settings::Get().SetSurfacePoolBudgetPercent(
-                           static_cast<i32>(v));
-                     }},
-     .options = kVramBudget,
-     .count = OptCount(kVramBudget),
-     .sliderUi = true},
 };
 
 constexpr SettingRow kAudioSettings[] = {
