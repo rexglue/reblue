@@ -14,12 +14,14 @@
 
 #include <rex/cvar.h>
 #include <rex/filesystem.h>
+#include <rex/platform/env.h>
 #include <rex/types.h>
 
 #include "core/app_root.h"
 #include "core/build_info.h"
 #include "core/logging.h"
 #include "core/settings.h"
+#include "platform/appimage_update.h"
 #include "platform/content_sync.h"
 #include "platform/manifest.h"
 #include "platform/package.h"
@@ -47,11 +49,32 @@ std::filesystem::path RunningBundle() {
 }
 #endif
 
+#if !defined(_WIN32) && !defined(__APPLE__)
+std::filesystem::path RunningAppImage() {
+  const auto value = rex::platform::env::get("APPIMAGE");
+  if (!value || value->empty())
+    return {};
+  const std::filesystem::path appimage(*value);
+  if (!appimage.is_absolute() || !IsType2AppImage(appimage))
+    return {};
+  return appimage;
+}
+#endif
+
 } // namespace
 
 Updates &Updates::Get() {
   static Updates s;
   return s;
+}
+
+bool Updates::CanApply() {
+#if defined(_WIN32) || defined(__APPLE__)
+  return true;
+#else
+  static const bool can_apply = !RunningAppImage().empty();
+  return can_apply;
+#endif
 }
 
 void Updates::Start() {
@@ -178,11 +201,6 @@ void Updates::BeginApply(const std::filesystem::path &install_root) {
 }
 
 Updates::ApplyResult Updates::Apply(const std::filesystem::path &install_root) {
-#if !defined(_WIN32) && !defined(__APPLE__)
-  (void)install_root;
-  BD_INFO("Update apply is Windows and macOS only for now");
-  return ApplyResult::kNoUpdate;
-#else
   const DownloadProgress progress = [this](u64 done, u64 total) {
     apply_done_.store(done, std::memory_order_relaxed);
     if (total != 0)
@@ -196,8 +214,60 @@ Updates::ApplyResult Updates::Apply(const std::filesystem::path &install_root) {
     BD_WARN("Manifest names no build for {}", AppManifest::PlatformKey());
     return ApplyResult::kNoUpdate;
   }
+  apply_total_.store(artifact->size, std::memory_order_relaxed);
 
   namespace fs = std::filesystem;
+#if !defined(_WIN32) && !defined(__APPLE__)
+  (void)install_root;
+  const fs::path appimage = RunningAppImage();
+  if (appimage.empty()) {
+    BD_ERROR("Update apply needs a running Type 2 AppImage");
+    return ApplyResult::kNoUpdate;
+  }
+
+  fs::path incoming = appimage;
+  incoming += ".incoming";
+  BD_INFO("Downloading v{} AppImage ({} bytes)", manifest->app_version,
+          artifact->size);
+  switch (Package::FetchVerified(artifact->url, artifact->sha256, incoming,
+                                 progress)) {
+  case Package::Result::kOk:
+    break;
+  case Package::Result::kDownloadFailed:
+    return ApplyResult::kDownloadFailed;
+  case Package::Result::kHashMismatch:
+    return ApplyResult::kHashMismatch;
+  case Package::Result::kUnpackFailed:
+    return ApplyResult::kInstallFailed;
+  }
+
+  std::error_code ec;
+  const u64 downloaded_size = fs::file_size(incoming, ec);
+  if (ec || downloaded_size != artifact->size) {
+    if (ec) {
+      BD_ERROR("Could not read the downloaded AppImage size: {}", ec.message());
+    } else {
+      BD_ERROR("Downloaded AppImage is {} bytes, manifest names {}",
+               downloaded_size, artifact->size);
+    }
+    fs::remove(incoming, ec);
+    return ApplyResult::kInstallFailed;
+  }
+
+  std::string error;
+  // Warm reboot exits back to Steam instead of spawning in Game Mode, so the
+  // pathname has to hold the new image before the reboot is requested.
+  if (!ReplaceAppImage(appimage, incoming, error)) {
+    BD_ERROR("Could not install the downloaded AppImage: {}", error);
+    fs::remove(incoming, ec);
+    return ApplyResult::kInstallFailed;
+  }
+
+  apply_done_.store(artifact->size, std::memory_order_relaxed);
+  BD_INFO("Installed v{} over {}; it takes effect after restart",
+          manifest->app_version, appimage.string());
+  return ApplyResult::kStaged;
+#else
   const auto zip = bd::CacheRootFor(install_root) / "update" /
                    ("reblue-" + manifest->app_version + ".zip");
   const auto staging = install_root / kStagingDir;
@@ -550,6 +620,12 @@ bool InstallStagedUpdate(const std::filesystem::path &install_root) {
 
 void ClearReplacedFiles(const std::filesystem::path &install_root) {
   (void)install_root;
+  const auto appimage = RunningAppImage();
+  if (appimage.empty())
+    return;
+  std::string error;
+  if (!ClearReplacedAppImage(appimage, error))
+    BD_WARN("Could not clear the previous AppImage: {}", error);
 }
 #endif
 

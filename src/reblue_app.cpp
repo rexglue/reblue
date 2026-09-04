@@ -556,6 +556,10 @@ void ReblueApp::OnConfigurePaths(rex::PathConfig &paths) {
   }
 #endif
 
+#if !defined(_WIN32) && !defined(__APPLE__)
+  bd::platform::ClearReplacedFiles(install_root_);
+#endif
+
 #if defined(_WIN32) || defined(__APPLE__)
   // A build-dir exe run against this install is not part of it, so swapping
   // release binaries in under it would strand the debugger on the wrong image.

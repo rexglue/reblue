@@ -42,16 +42,17 @@ public:
 
   enum class ApplyStage {
     kIdle,    // nothing asked for
-    kWorking, // downloading, verifying, unpacking
+    kWorking, // downloading, verifying, preparing
     kDone,    // finished, with Applied naming the outcome
   };
 
   enum class ApplyResult {
-    kStaged,         // verified and ready, installs on the next launch
+    kStaged,         // verified and ready; takes effect after restart
     kNoUpdate,       // no manifest yet, or it names no build for this platform
     kDownloadFailed, // network/HTTP failure
     kHashMismatch,   // downloaded bytes do not match the manifest's sha256
     kUnpackFailed,   // corrupt archive or wrong contents
+    kInstallFailed,  // payload is invalid or could not replace the application
   };
 
   // Arms the channel watch. The first check is the title prompt's BeginCheck.
@@ -76,13 +77,7 @@ public:
   // Whether this platform can install what the apply downloads. False means
   // the check still runs and still logs, but nothing offers the user an
   // update it would then fail to apply.
-  static constexpr bool CanApply() {
-#if defined(_WIN32) || defined(__APPLE__)
-    return true;
-#else
-    return false;
-#endif
-  }
+  static bool CanApply();
 
   // The manifest the last successful check read, whatever it said about
   // versions.
@@ -134,8 +129,8 @@ private:
 // under the install root. Either every file swaps or none does.
 bool InstallStagedUpdate(const std::filesystem::path &install_root);
 
-// Deletes the predecessors a previous InstallStagedUpdate renamed out of the
-// way, and retries on a later launch whatever is still locked.
+// Deletes predecessors retained during the previous successful install, and
+// retries on a later launch whatever is still locked.
 void ClearReplacedFiles(const std::filesystem::path &install_root);
 
 } // namespace bd::platform

@@ -13,28 +13,56 @@
 
 namespace bd::platform {
 
+Package::Result Package::FetchVerified(const std::string &url,
+                                       const std::string &sha256,
+                                       const std::filesystem::path &dest,
+                                       const DownloadProgress &progress) {
+  namespace fs = std::filesystem;
+  std::error_code ec;
+  const fs::path parent = dest.parent_path();
+  if (!parent.empty()) {
+    fs::create_directories(parent, ec);
+    if (ec) {
+      BD_ERROR("[package] cannot create {}: {}", parent.string(), ec.message());
+      return Result::kDownloadFailed;
+    }
+  }
+
+  if (fs::symlink_status(dest, ec).type() == fs::file_type::regular &&
+      bd::SHA256File(dest) == sha256)
+    return Result::kOk;
+
+  ec.clear();
+  fs::remove(dest, ec);
+  if (ec) {
+    BD_ERROR("[package] cannot replace {}: {}", dest.string(), ec.message());
+    return Result::kDownloadFailed;
+  }
+
+  const HTTPResult result = HTTP::Download(url, dest, progress);
+  if (!result.Succeeded()) {
+    BD_ERROR("[package] {} download failed: {}", url, result.error);
+    return Result::kDownloadFailed;
+  }
+  if (bd::SHA256File(dest) != sha256) {
+    BD_ERROR("[package] {} does not match its manifest digest", url);
+    fs::remove(dest, ec);
+    return Result::kHashMismatch;
+  }
+  return Result::kOk;
+}
+
 Package::Result Package::Fetch(const std::string &url,
                                const std::string &sha256,
                                const std::filesystem::path &cache_zip,
                                const std::filesystem::path &dest,
                                const DownloadProgress &progress) {
   namespace fs = std::filesystem;
+  const Result fetched = FetchVerified(url, sha256, cache_zip, progress);
+  if (fetched != Result::kOk)
+    return fetched;
+
   std::error_code ec;
-  fs::create_directories(cache_zip.parent_path(), ec);
-
-  if (!fs::exists(cache_zip, ec) || bd::SHA256File(cache_zip) != sha256) {
-    const HTTPResult result = HTTP::Download(url, cache_zip, progress);
-    if (!result.Succeeded()) {
-      BD_ERROR("[package] {} download failed: {}", url, result.error);
-      return Result::kDownloadFailed;
-    }
-    if (bd::SHA256File(cache_zip) != sha256) {
-      BD_ERROR("[package] {} does not match its manifest digest", url);
-      fs::remove(cache_zip, ec);
-      return Result::kHashMismatch;
-    }
-  }
-
   fs::remove_all(dest, ec);
   std::string error;
   if (!bd::UnpackZip(cache_zip, dest, error)) {

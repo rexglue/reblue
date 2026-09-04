@@ -29,7 +29,6 @@ includes = [
 setjmp_address = 0x826C5D00
 longjmp_address = 0x826C5AB0
 
-skip_lr = true
 ctr_as_local = true
 xer_as_local = true
 cr_as_local = true
