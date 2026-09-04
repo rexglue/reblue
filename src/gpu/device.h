@@ -150,6 +150,10 @@ public:
 
   static plume::RenderDevice *HostDevice();
 
+  static plume::RenderFormat DepthStencilFormat();
+
+  static plume::RenderFormat SceneColorFormat();
+
   struct VideoMemory {
     u64 used = 0;
     u64 budget = 0;
@@ -366,8 +370,11 @@ struct VideoState {
 
   std::string backend_info;
 
-  // AND of device sample count support for scene color (R16G16B16A16_FLOAT) and
-  // depth (D32_FLOAT_S8_UINT). bd_msaa is clamped to this.
+  plume::RenderFormat depth_stencil_format =
+      plume::RenderFormat::D32_FLOAT_S8_UINT;
+  plume::RenderFormat scene_color_format =
+      plume::RenderFormat::R16G16B16A16_FLOAT;
+
   plume::RenderSampleCounts supported_sample_mask =
       plume::RenderSampleCount::COUNT_1;
 

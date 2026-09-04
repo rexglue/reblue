@@ -255,6 +255,31 @@ std::string DescribeBackend(plume::RenderDevice *device) {
 #endif
 }
 
+plume::RenderFormat
+PickDepthStencilFormat([[maybe_unused]] plume::RenderDevice *device) {
+#if defined(REBLUE_D3D12)
+  const auto vendor = device->getDescription().vendor;
+  if ((vendor == plume::RenderDeviceVendor::NVIDIA ||
+       vendor == plume::RenderDeviceVendor::INTEL) &&
+      (device->getSampleCountsSupported(
+           plume::RenderFormat::D24_UNORM_S8_UINT) &
+       plume::RenderSampleCount::COUNT_1)) {
+    return plume::RenderFormat::D24_UNORM_S8_UINT;
+  }
+#endif
+  return plume::RenderFormat::D32_FLOAT_S8_UINT;
+}
+
+plume::RenderFormat PickSceneColorFormat(plume::RenderDevice *device) {
+  if (Settings::Get().SceneColorR11G11B10() &&
+      (device->getSampleCountsSupported(
+           plume::RenderFormat::R11G11B10_FLOAT) &
+       plume::RenderSampleCount::COUNT_1)) {
+    return plume::RenderFormat::R11G11B10_FLOAT;
+  }
+  return plume::RenderFormat::R16G16B16A16_FLOAT;
+}
+
 } // namespace
 
 VideoState &state() {
@@ -311,10 +336,12 @@ bool Video::CreateHostDevice(rex::ui::Window *window) {
     s.backend_info = DescribeBackend(s.device.get());
     // bd_msaa is clamped to the color/depth intersection. Everything
     // shader-resolves, so no hardware resolve capability is needed.
-    const auto color_counts = s.device->getSampleCountsSupported(
-        plume::RenderFormat::R16G16B16A16_FLOAT);
-    const auto depth_counts = s.device->getSampleCountsSupported(
-        plume::RenderFormat::D32_FLOAT_S8_UINT);
+    s.depth_stencil_format = PickDepthStencilFormat(s.device.get());
+    s.scene_color_format = PickSceneColorFormat(s.device.get());
+    const auto color_counts =
+        s.device->getSampleCountsSupported(s.scene_color_format);
+    const auto depth_counts =
+        s.device->getSampleCountsSupported(s.depth_stencil_format);
     s.supported_sample_mask = color_counts & depth_counts;
 
     s.queue =
@@ -333,10 +360,16 @@ bool Video::CreateHostDevice(rex::ui::Window *window) {
     const bool upload_caps = s.device->getCapabilities().gpuUploadHeap;
     const bool upload_on = upload_caps && Settings::Get().GeometryGPUUpload();
     std::string caps = std::format(
-        "GPU caps: {} on {} | MSAA color=0x{:X} depth=0x{:X} usable=0x{:X} | "
-        "geometry GPU_UPLOAD {}",
-        s.backend_info, s.device->getDescription().name, color_counts,
-        depth_counts, s.supported_sample_mask,
+        "GPU caps: {} on {} | scene {} {} | MSAA color=0x{:X} depth=0x{:X} "
+        "usable=0x{:X} | geometry GPU_UPLOAD {}",
+        s.backend_info, s.device->getDescription().name,
+        s.scene_color_format == plume::RenderFormat::R11G11B10_FLOAT
+            ? "R11G11B10"
+            : "RGBA16F",
+        s.depth_stencil_format == plume::RenderFormat::D24_UNORM_S8_UINT
+            ? "D24S8"
+            : "D32S8",
+        color_counts, depth_counts, s.supported_sample_mask,
         upload_on      ? "on"
         : !upload_caps ? "unsupported"
                        : "off (bd_geometry_gpu_upload)");
@@ -741,6 +774,14 @@ void Video::SetOverlayDrawHook(OverlayDrawHook hook) {
 }
 
 plume::RenderDevice *Video::HostDevice() { return state().device.get(); }
+
+plume::RenderFormat Video::DepthStencilFormat() {
+  return state().depth_stencil_format;
+}
+
+plume::RenderFormat Video::SceneColorFormat() {
+  return state().scene_color_format;
+}
 
 Video::VideoMemory Video::MemoryUsage() {
   VideoMemory m;

@@ -10,6 +10,7 @@
 #include <atomic>
 
 #include "core/logging.h"
+#include "gpu/device.h"
 
 namespace bd::gpu {
 namespace {
@@ -183,12 +184,10 @@ plume::RenderFormat ConvertGuestFormat(u32 guest_format) {
   case D3DFormat::kBare2101010As16161616:
     // X360 7e3 HDR EDRAM format. It must stay float: UNORM would clamp the
     // HDR scene the posteff chain relies on.
-    return plume::RenderFormat::R16G16B16A16_FLOAT;
+    return Video::SceneColorFormat();
   case D3DFormat::kD24FS8:
   case D3DFormat::kD24S8:
-    // Preserve the stencil plane: BD's bdShadowStencilDrawIndexed pass
-    // enables stencil, and a DSV without one is rejected at OM bind.
-    return plume::RenderFormat::D32_FLOAT_S8_UINT;
+    return Video::DepthStencilFormat();
   case D3DFormat::kR32F:
     return plume::RenderFormat::R32_FLOAT;
   case D3DFormat::kG16R16F:
@@ -224,6 +223,7 @@ bool IsRenderTargetCapable(plume::RenderFormat format) {
   case plume::RenderFormat::R16G16B16A16_FLOAT:
   case plume::RenderFormat::R16G16B16A16_UNORM:
   case plume::RenderFormat::R32G32B32A32_FLOAT:
+  case plume::RenderFormat::R11G11B10_FLOAT:
     return true;
   default:
     return false;

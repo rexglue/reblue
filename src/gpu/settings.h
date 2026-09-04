@@ -117,6 +117,7 @@ public:
   bool PSOPrecache() const { return psoPrecache_; }
   bool GeometryGPUUpload() const { return geometryGPUUpload_; }
   bool DRED() const { return dred_; }
+  bool SceneColorR11G11B10() const { return sceneColorR11G11B10_; }
   i32 SuperSampling() const { return superSampling_; }
   bool SetSuperSampling(i32 v);
   i32 MSAA() const { return msaa_; }
@@ -146,6 +147,7 @@ private:
   void AdoptPSOPrecache();
   void AdoptGeometryGPUUpload();
   void AdoptDRED();
+  void AdoptSceneColorR11G11B10();
   void AdoptSuperSampling();
   void AdoptMSAA();
 
@@ -162,6 +164,7 @@ private:
   bool psoPrecache_ = true;
   bool geometryGPUUpload_ = true;
   bool dred_ = true;
+  bool sceneColorR11G11B10_ = false;
   i32 diagVerbosity_ = 2;
 };
 

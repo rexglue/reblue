@@ -112,12 +112,8 @@ plume::RenderFormat ConvertGuestFormat(u32 guest_format);
 // Whitelist of RT-capable formats ConvertGuestFormat emits.
 bool IsRenderTargetCapable(plume::RenderFormat format);
 
-// True for any depth-attachment-capable plume format reblue uses: D32_FLOAT and
-// D32_FLOAT_S8_UINT (D24S8/D24FS8 map to the latter to keep the stencil plane
-// bdShadowStencilDrawIndexed relies on).
 inline bool IsDepthFormat(plume::RenderFormat format) {
-  return format == plume::RenderFormat::D32_FLOAT ||
-         format == plume::RenderFormat::D32_FLOAT_S8_UINT;
+  return plume::RenderFormatIsDepth(format);
 }
 
 // GPUTEXTUREFORMAT byte -> plume BCn UNORM. Returns false for unsupported

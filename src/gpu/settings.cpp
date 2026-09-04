@@ -18,6 +18,7 @@
 REXCVAR_DECLARE(bool, bd_pso_precache);
 REXCVAR_DECLARE(bool, bd_geometry_gpu_upload);
 REXCVAR_DECLARE(bool, bd_dred);
+REXCVAR_DECLARE(bool, bd_scene_color_r11g11b10);
 REXCVAR_DECLARE(i32, bd_anisotropy);
 REXCVAR_DECLARE(i32, bd_supersampling);
 REXCVAR_DECLARE(i32, bd_msaa);
@@ -43,6 +44,12 @@ REXCVAR_DEFINE_BOOL(bd_dred, true, kCvarGroup,
                     "Record D3D12 auto-breadcrumbs and page-fault allocations "
                     "so a lost device names the op and resource it died on. "
                     "Costs a little GPU time per op. Requires restart.");
+
+REXCVAR_DEFINE_BOOL(bd_scene_color_r11g11b10, false, kCvarGroup,
+                    "Store the HDR scene as R11G11B10_FLOAT instead of "
+                    "R16G16B16A16_FLOAT: half the VRAM per scene surface, "
+                    "no alpha channel, 6/6/5-bit mantissas. Requires "
+                    "restart.");
 
 REXCVAR_DEFINE_INT32(bd_anisotropy, 16, kCvarGroup,
                      "Anisotropic texture filtering level.")
@@ -194,6 +201,9 @@ void Settings::AdoptGeometryGPUUpload() {
   geometryGPUUpload_ = REXCVAR_GET(bd_geometry_gpu_upload);
 }
 void Settings::AdoptDRED() { dred_ = REXCVAR_GET(bd_dred); }
+void Settings::AdoptSceneColorR11G11B10() {
+  sceneColorR11G11B10_ = REXCVAR_GET(bd_scene_color_r11g11b10);
+}
 void Settings::AdoptSuperSampling() {
   superSampling_ = REXCVAR_GET(bd_supersampling);
 }
@@ -299,6 +309,7 @@ void Settings::AdoptCvars() {
   AdoptPSOPrecache();
   AdoptGeometryGPUUpload();
   AdoptDRED();
+  AdoptSceneColorR11G11B10();
   AdoptSuperSampling();
   AdoptMSAA();
 }
@@ -324,6 +335,7 @@ void Settings::Init() {
   reg("bd_pso_precache", &Settings::AdoptPSOPrecache);
   reg("bd_geometry_gpu_upload", &Settings::AdoptGeometryGPUUpload);
   reg("bd_dred", &Settings::AdoptDRED);
+  reg("bd_scene_color_r11g11b10", &Settings::AdoptSceneColorR11G11B10);
   reg("bd_supersampling", &Settings::AdoptSuperSampling);
   reg("bd_msaa", &Settings::AdoptMSAA);
 }

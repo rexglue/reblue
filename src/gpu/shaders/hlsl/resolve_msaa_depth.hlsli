@@ -1,8 +1,6 @@
 #pragma once
 #include "copy_common.hlsli"
 
-// Plume picks the depth-plane format (R32_FLOAT_X8X24_TYPELESS) for a
-// D32_FLOAT_S8_UINT MS texture, so a Texture2DMS<float> reads depth.
 Texture2DMS<float, SAMPLE_COUNT> g_Texture2DMSDescriptorHeap[] : register(t0, space0);
 
 float main(in float4 position : SV_Position, in float2 texCoord : TEXCOORD) : SV_Depth

@@ -61,6 +61,14 @@ u64 ShaderHash(GuestShader *s) {
   return s->shaderCacheEntry->hash;
 }
 
+plume::RenderFormat CapturedFormat(plume::RenderFormat format) {
+  if (plume::RenderFormatIsStencil(format))
+    return plume::RenderFormat::D32_FLOAT_S8_UINT;
+  if (format == plume::RenderFormat::R11G11B10_FLOAT)
+    return plume::RenderFormat::R16G16B16A16_FLOAT;
+  return format;
+}
+
 // Content hash identity of a pipeline, independent of live pointers and the
 // MSAA/A2C config axes the capture masks. Lets a render thread compile be told
 // apart: present in the static residual (its background compile just lost the
@@ -71,6 +79,8 @@ u64 ResidualKey(PipelineState s, u64 vsHash, u64 psHash, u64 declHash) {
   s.vertexDeclaration = reinterpret_cast<GuestVertexDeclaration *>(declHash);
   s.sampleCount = plume::RenderSampleCount::COUNT_1;
   s.enableAlphaToCoverage = false;
+  s.renderTargetFormat = CapturedFormat(s.renderTargetFormat);
+  s.depthStencilFormat = CapturedFormat(s.depthStencilFormat);
   return HashPipelineState(s);
 }
 
@@ -127,8 +137,8 @@ bool TryResolveAndEnqueueLocked(const PipelineState &entry) {
   // compile. Scene signature = the only surface pair BD multisamples.
   const plume::RenderSampleCounts msaa = Video::CvarMSAASampleCount();
   if (msaa != plume::RenderSampleCount::COUNT_1 &&
-      resolved.renderTargetFormat == plume::RenderFormat::R16G16B16A16_FLOAT &&
-      resolved.depthStencilFormat == plume::RenderFormat::D32_FLOAT_S8_UINT) {
+      resolved.renderTargetFormat == Video::SceneColorFormat() &&
+      plume::RenderFormatIsStencil(resolved.depthStencilFormat)) {
     PipelineState ms = resolved;
     ms.sampleCount = msaa;
     EnqueuePipelinePriority(ms);
@@ -240,8 +250,8 @@ std::string CsvRow(const Entry &e) {
     }
     c.push_back(std::move(strides));
   }
-  en(s.renderTargetFormat);
-  en(s.depthStencilFormat);
+  en(CapturedFormat(s.renderTargetFormat));
+  en(CapturedFormat(s.depthStencilFormat));
   u(static_cast<u32>(s.sampleCount));
   bl(s.enableAlphaToCoverage);
   u(s.specConstants);

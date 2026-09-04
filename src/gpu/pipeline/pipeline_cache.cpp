@@ -80,10 +80,14 @@ void SanitizePipelineState(PipelineState &state) {
     state.stencilEnable = false;
   }
 
-  // Stencil needs an S8 component in the bound DS. Enabling it on a depth-only
-  // format (D32_FLOAT / D16_UNORM) is an invalid PSO, and D32_FLOAT_S8_UINT is
-  // the only stencil-bearing depth format reblue binds.
-  if (state.depthStencilFormat != plume::RenderFormat::D32_FLOAT_S8_UINT) {
+  if (state.depthStencilFormat == plume::RenderFormat::D32_FLOAT_S8_UINT) {
+    state.depthStencilFormat = Video::DepthStencilFormat();
+  }
+  if (state.renderTargetFormat == plume::RenderFormat::R16G16B16A16_FLOAT) {
+    state.renderTargetFormat = Video::SceneColorFormat();
+  }
+
+  if (!plume::RenderFormatIsStencil(state.depthStencilFormat)) {
     state.stencilEnable = false;
   }
 

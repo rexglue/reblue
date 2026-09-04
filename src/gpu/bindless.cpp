@@ -89,8 +89,6 @@ u32 BindTextureSRVLocked(VideoState &s, GuestTexture *tex) {
     plume::RenderTextureViewDesc view_desc;
     // D3D12 forbids a typed-depth SRV format, so view D32_FLOAT as R32_FLOAT
     // for BD's depth shader-resolves (fog / soft particles / SSAO inputs).
-    // D32_FLOAT_S8_UINT is left as-is: plume's toDXGITextureView already
-    // specializes it to a depth-only view.
     view_desc.format = (tex->format == plume::RenderFormat::D32_FLOAT)
                            ? plume::RenderFormat::R32_FLOAT
                            : tex->format;

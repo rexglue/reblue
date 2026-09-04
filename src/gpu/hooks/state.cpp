@@ -126,9 +126,6 @@ void D3DDevice_SetDepthStencilSurface_hook(
     pDevice->depthStencilShadow = pZStencilSurface.guest_address();
   }
   // FromGuest verifies registration, not ResourceType: reject non-depth so a
-  // wrong-type struct never binds as depth_stencil. D32_FLOAT_S8_UINT (BD's
-  // D24S8/D24FS8) registers as DepthStencil, and legacy depth resolve dests as
-  // Texture, so accept both.
   if (surface) {
     const bool is_depth =
         surface->type == bd::gpu::ResourceType::DepthStencil ||
