@@ -167,6 +167,21 @@ void bdOutputResViewScaleHook(PPCRegister &f1, PPCRegister &f2) {
   }
 }
 
+void bdIssEventDimHook(PPCRegister &r10, PPCRegister &r11) {
+  u32 w, h;
+  if (!Output::LatchedFit(w, h))
+    return;
+  const u32 origW = r11.u32;
+  const u32 origH = r10.u32;
+  if (origW > kDesignCanvasWidth || origH > kDesignCanvasHeight)
+    return;
+  const double s = h / static_cast<double>(kDesignCanvasHeight);
+  if (s > 1.0) {
+    r11.u32 = static_cast<u32>(origW * s);
+    r10.u32 = static_cast<u32>(origH * s);
+  }
+}
+
 // This site takes its aspect from the view's own width over height, so the
 // full-frame view renders at the design ratio and the composite stretches it
 // over the whole surface. Nothing here can see that stretch, so the full-frame

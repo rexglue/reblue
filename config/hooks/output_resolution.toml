@@ -72,6 +72,12 @@ name = "bdOutputResViewScaleHook"
 registers = ["f1", "f2"]
 after_instruction = false
 
+[[midasm_hook]]
+address = 0x823F76E4
+name = "bdIssEventDimHook"
+registers = ["r10", "r11"]
+after_instruction = true
+
 # And a fourth, bdBuildMirrorViewProjection, the mirror view bdRenderViewSubmit
 # builds for the planar reflection. The water samples it at the pixel's screen UV,
 # so the reflection has to be framed exactly like the scene. Left out of the set
