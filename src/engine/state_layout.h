@@ -42,6 +42,8 @@ inline constexpr u32 kLocaleId = 0x827A8578; // locale the guest latched at boot
 inline constexpr u32 kShadowLightView = 0x82DD6144;
 inline constexpr u32 kRenderView = 0x82DE87E0;
 inline constexpr u32 kCubeShadowLightView = 0x82776DA8;
+inline constexpr u32 kProjectorMapInfos = 0x82DD6100;
+inline constexpr u32 kProjectorMapInfosEnd = 0x82DD7170;
 inline constexpr u32 kCameraRenderVO = 0x82DBA92C;
 inline constexpr u32 kCameraViewList = 0x82DC9854;
 } // namespace addr

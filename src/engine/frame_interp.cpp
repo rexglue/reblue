@@ -51,22 +51,35 @@ template <typename T> T *TryStruct(u32 va) {
 
 constexpr float kViewCutRotDot = 0.90f;
 constexpr float kEventViewCutStep = 2.0f;
+constexpr u32 kMaxCutRun = 1;
 constexpr float kEventObjCutStep = 8.0f;
 
-struct ViewEntry {
-  float prevView[16];
-  float currView[16];
+struct MatrixTrack {
+  struct Sample {
+    bool rotated = false;
+    bool passthrough = false;
+    double spacing = 0.0;
+  };
+
+  float prev[16];
+  float curr[16];
   float avgStep = 0.0f;
+  u32 cutRun = 0;
   double lastChange = 0.0;
   u64 changeTick = ~0ull;
   u64 lastSeen = 0;
   bool valid = false;
   bool cut = false;
+
+  Sample Advance(const float live[16], double now);
+  float Alpha() const;
+  void DetectCut(double spacing);
 };
 
-std::unordered_map<u32, ViewEntry> g_views;
+std::unordered_map<u32, MatrixTrack> g_views;
 u64 g_camFrame = 0;
 u32 g_viewScratch = 0;
+u32 g_projScratch = 0;
 
 void ReadFloats(be_f32 *p, float *out, int n) {
   for (int i = 0; i < n; ++i)
@@ -261,6 +274,35 @@ u64 NodeIdentity(u32 nodeIdx) {
   return vo ? ((u64(nodeIdx) + 1) << 32) | vo : 0;
 }
 
+struct DrawRecord_t {
+  /* 0x000 */ u8 _pad000[0x10];
+  /* 0x010 */ be_f32 worldMatrix[16];
+  /* 0x050 */ u8 _pad050[0xFC - 0x50];
+  /* 0x0FC */ be_u32 part;
+  /* 0x100 */ u8 _pad100[0x110 - 0x100];
+  /* 0x110 */ be_u32 visualObject;
+  /* 0x114 */ u8 _pad114[0x118 - 0x114];
+  /* 0x118 */ be_u16 range[3];
+
+  u64 Key() const {
+    u64 h = 1469598103934665603ull;
+    const auto mix = [&h](u32 v) { h = (h ^ v) * 1099511628211ull; };
+    mix(visualObject);
+    mix(part);
+    for (const be_u16 &r : range)
+      mix(r);
+    return (1ull << 61) | (h >> 3);
+  }
+};
+static_assert(offsetof(DrawRecord_t, worldMatrix) == 0x010);
+static_assert(offsetof(DrawRecord_t, part) == 0x0FC);
+static_assert(offsetof(DrawRecord_t, visualObject) == 0x110);
+static_assert(offsetof(DrawRecord_t, range) == 0x118);
+
+constexpr u32 kRecMatrix = offsetof(DrawRecord_t, worldMatrix);
+
+thread_local bool t_inRecordReplay = false;
+
 constexpr float kCutDistance = 64.0f;
 constexpr float kCutRatio = 10.0f;
 constexpr float kCutFloor = 20.0f;
@@ -300,6 +342,12 @@ float MinRowDot(const float *cur, const float *prv) {
 
 bool RotationDiscontinuous(const float *cur, const float *prv, float floor) {
   return MinRowDot(cur, prv) < floor;
+}
+
+bool ProjectorView(u32 va) {
+  return va == bd::engine::addr::kCubeShadowLightView ||
+         (va >= bd::engine::addr::kProjectorMapInfos &&
+          va < bd::engine::addr::kProjectorMapInfosEnd);
 }
 
 bool InShadowDepthPass() {
@@ -369,8 +417,16 @@ bool BoneArrayOwned(u32 va) {
   return false;
 }
 
-bool BoneBlendedVO(u32 vo) {
-  return vo != 0 && g_boneArrays.count(vo + kVOCurrBones) != 0;
+void RegisterBoneArray(u32 vo) {
+  if (!bd::engine::InterpolationActive() || vo == 0)
+    return;
+  const u32 count = bd::mem::try_load<u32>(vo + kVOBoneCount);
+  if (count == 0 || count > kMaxBoneMatrices)
+    return;
+  std::lock_guard<std::mutex> lock(g_interpMutex);
+  BoneArray &e = g_boneArrays[vo + kVOCurrBones];
+  e.count = count;
+  e.copyTime = bd::engine::FrameTime();
 }
 
 void PruneBoneArrays() {
@@ -540,6 +596,38 @@ void bdActEvClockMismatchHook(PPCRegister &r11) {
 }
 
 bool bdShaderAnimGateHook() { return !bd::engine::TickDue(); }
+
+void bdPopUpAgeLerpHook(PPCRegister &age) {
+  if (bd::engine::InterpolationActive())
+    age.f64 += bd::engine::Alpha();
+}
+
+namespace {
+
+constexpr u32 kMaxChainEntries = 4096;
+
+} // namespace
+
+void bdAnimeChainEnableActiveHook(PPCRegister &r28) {
+  using namespace bd::engine;
+  auto *anime = bd::mem::try_at<AnimeData_t>(r28.u32);
+  if (!anime || anime->activeChain.size() > kMaxChainEntries)
+    return;
+  const f32 clock = anime->frame;
+  for (u32 i = 0; i < anime->activeChain.size(); ++i) {
+    auto *node = anime->activeChain[i].get();
+    if (!node || node->elements.size() > kMaxChainEntries)
+      continue;
+    for (u32 j = 0; j < node->elements.size(); ++j) {
+      auto *element = node->elements[j].get();
+      if (!element)
+        continue;
+      element->timer = clock;
+      if (auto *child = element->childAnime.get())
+        child->childEnabled = 1;
+    }
+  }
+}
 
 namespace {
 
@@ -1434,52 +1522,91 @@ void ClearLightChangedList() {
   bd::mem::store<u32>(kLightChangedCountEA, 0u);
 }
 
-bool ServeView(ViewEntry &e, const float live[16], double now, float out[16]) {
+MatrixTrack::Sample MatrixTrack::Advance(const float live[16], double now) {
+  Sample s;
   bool changed = false;
   for (int i = 0; i < 16 && !changed; ++i)
-    changed = e.currView[i] != live[i];
-  if (!e.valid) {
+    changed = curr[i] != live[i];
+  if (!valid) {
     for (int i = 0; i < 16; ++i)
-      e.prevView[i] = e.currView[i] = live[i];
-    e.valid = true;
-    e.lastChange = now;
-  } else if (changed) {
-    const double spacing = now - e.lastChange;
-    const bool fast = spacing < kFastChangeSeconds;
-    for (int i = 0; i < 16; ++i) {
-      e.prevView[i] = fast ? live[i] : e.currView[i];
-      e.currView[i] = live[i];
-    }
-    e.lastChange = now;
-    e.changeTick = bd::engine::TickDue() ? bd::engine::TickCount() : ~0ull;
-    if (fast) {
-      for (int i = 0; i < 16; ++i)
-        out[i] = live[i];
-      return true;
-    }
-    float pe[3], ce[3];
-    EyeFromView(e.prevView, pe);
-    EyeFromView(e.currView, ce);
-    const float step = std::sqrt(EyeDistSq(pe, ce));
-    e.cut = StepDiscontinuous(step, e.avgStep) ||
-            (EventSceneEngaged() && step > kEventViewCutStep &&
-             spacing > kEventCutSpacing) ||
-            RotationDiscontinuous(e.currView, e.prevView, kViewCutRotDot);
-    if (e.cut)
-      g_cutTick.store(bd::engine::TickCount(), std::memory_order_relaxed);
-    else
-      e.avgStep = BlendStep(e.avgStep, step);
+      prev[i] = curr[i] = live[i];
+    valid = true;
+    lastChange = now;
+    return s;
   }
-  float alpha = 1.0f;
-  if (e.changeTick == bd::engine::TickCount())
-    alpha = bd::engine::Alpha();
-  else if (e.changeTick == ~0ull)
-    alpha = EntityAlpha(e.lastChange);
-  if (e.cut) {
+  if (!changed)
+    return s;
+  s.spacing = now - lastChange;
+  const bool fast = s.spacing < kFastChangeSeconds;
+  for (int i = 0; i < 16; ++i) {
+    prev[i] = fast ? live[i] : curr[i];
+    curr[i] = live[i];
+  }
+  lastChange = now;
+  changeTick = bd::engine::TickDue() ? bd::engine::TickCount() : ~0ull;
+  s.rotated = !fast;
+  s.passthrough = fast;
+  return s;
+}
+
+float MatrixTrack::Alpha() const {
+  if (changeTick == bd::engine::TickCount())
+    return bd::engine::Alpha();
+  if (changeTick == ~0ull)
+    return EntityAlpha(lastChange);
+  return 1.0f;
+}
+
+void MatrixTrack::DetectCut(double spacing) {
+  float pe[3], ce[3];
+  EyeFromView(prev, pe);
+  EyeFromView(curr, ce);
+  const float step = std::sqrt(EyeDistSq(pe, ce));
+  const bool discontinuous =
+      StepDiscontinuous(step, avgStep) ||
+      (EventSceneEngaged() && step > kEventViewCutStep &&
+       spacing > kEventCutSpacing) ||
+      RotationDiscontinuous(curr, prev, kViewCutRotDot);
+  cut = discontinuous && cutRun < kMaxCutRun;
+  cutRun = discontinuous ? cutRun + 1 : 0;
+  if (cut)
+    g_cutTick.store(bd::engine::TickCount(), std::memory_order_relaxed);
+  else
+    avgStep = BlendStep(avgStep, step);
+}
+
+bool ServeView(MatrixTrack &e, const float live[16], double now,
+               float out[16]) {
+  const MatrixTrack::Sample s = e.Advance(live, now);
+  if (s.passthrough) {
     for (int i = 0; i < 16; ++i)
-      out[i] = e.currView[i];
+      out[i] = live[i];
+    return true;
+  }
+  if (s.rotated)
+    e.DetectCut(s.spacing);
+  if (CutThisTick()) {
+    for (int i = 0; i < 16; ++i)
+      out[i] = e.curr[i];
   } else {
-    LerpView(e.prevView, e.currView, alpha, out);
+    LerpView(e.prev, e.curr, e.Alpha(), out);
+  }
+  return false;
+}
+
+bool ServeProj(MatrixTrack &e, const float live[16], double now,
+               float out[16]) {
+  const MatrixTrack::Sample s = e.Advance(live, now);
+  if (s.passthrough) {
+    for (int i = 0; i < 16; ++i)
+      out[i] = live[i];
+    return true;
+  }
+  if (CutThisTick()) {
+    for (int i = 0; i < 16; ++i)
+      out[i] = e.curr[i];
+  } else {
+    LerpElements(e.prev, e.curr, e.Alpha(), out, 16);
   }
   return false;
 }
@@ -1494,32 +1621,50 @@ struct HUDAnchor {
   bool cut = false;
 };
 
-std::unordered_map<u32, HUDAnchor> g_hudAnchors;
-ViewEntry g_hudView;
+class HUDAnchorTable {
+public:
+  HUDAnchor &ForCall(u32 anchorVa) {
+    return anchors_[(u64(anchorVa) << 32) | ordinals_[anchorVa]++];
+  }
+
+  void BeginFrame(u64 frame) {
+    ordinals_.clear();
+    for (auto it = anchors_.begin(); it != anchors_.end();) {
+      if (frame - it->second.lastSeen > kMaxAnchorAge)
+        it = anchors_.erase(it);
+      else
+        ++it;
+    }
+  }
+
+private:
+  static constexpr u64 kMaxAnchorAge = 4;
+
+  std::unordered_map<u64, HUDAnchor> anchors_;
+  std::unordered_map<u32, u32> ordinals_;
+};
+
+HUDAnchorTable g_hudAnchors;
+MatrixTrack g_hudView;
+MatrixTrack g_hudProj;
 u32 g_hudScratch = 0;
 
 constexpr u32 kCameraView_Id = 0x00;
 constexpr u32 kCameraView_Next = 0x1C;
 constexpr u32 kCameraView_View = 0xB8;
+constexpr u32 kCameraView_Proj = 0xF8;
 
-bool MainCameraView(float out[16]) {
-  u32 view = bd::mem::try_load<u32>(bd::engine::addr::kCameraViewList);
-  while (view && bd::mem::try_load<u32>(view + kCameraView_Id) != 0)
-    view = bd::mem::try_load<u32>(view + kCameraView_Next);
-  auto *m = view ? bd::mem::try_at<be_f32>(view + kCameraView_View) : nullptr;
-  if (!m)
+bool MainCameraMatrices(float view[16], float proj[16]) {
+  u32 v = bd::mem::try_load<u32>(bd::engine::addr::kCameraViewList);
+  while (v && bd::mem::try_load<u32>(v + kCameraView_Id) != 0)
+    v = bd::mem::try_load<u32>(v + kCameraView_Next);
+  auto *mv = v ? bd::mem::try_at<be_f32>(v + kCameraView_View) : nullptr;
+  auto *mp = v ? bd::mem::try_at<be_f32>(v + kCameraView_Proj) : nullptr;
+  if (!mv || !mp)
     return false;
-  ReadFloats(m, out, 16);
+  ReadFloats(mv, view, 16);
+  ReadFloats(mp, proj, 16);
   return true;
-}
-
-void PruneHUDAnchors() {
-  for (auto it = g_hudAnchors.begin(); it != g_hudAnchors.end();) {
-    if (g_camFrame - it->second.lastSeen > 4)
-      it = g_hudAnchors.erase(it);
-    else
-      ++it;
-  }
 }
 
 void ProjectBlended(PPCContext &ctx, bool radius) {
@@ -1528,17 +1673,24 @@ void ProjectBlended(PPCContext &ctx, bool radius) {
   const u32 anchorVa = ctx.r6.u32;
   auto *in = bd::mem::try_at<be_f32>(anchorVa);
   float liveView[16];
-  if (!in || !MainCameraView(liveView))
+  float liveProj[16];
+  if (!in || !MainCameraMatrices(liveView, liveProj))
     return;
   float live[4] = {0.0f, 0.0f, 0.0f, 0.0f};
   ReadFloats(in, live, radius ? 4 : 3);
   std::lock_guard<std::mutex> lock(g_interpMutex);
   const double now = bd::engine::FrameTime();
+  HUDAnchor &a = g_hudAnchors.ForCall(anchorVa);
   float view[16];
   if (ServeView(g_hudView, liveView, now, view) || g_hudView.cut ||
       CutThisTick())
     return;
-  HUDAnchor &a = g_hudAnchors[anchorVa];
+  float proj[16];
+  ServeProj(g_hudProj, liveProj, now, proj);
+  const float sx =
+      std::fabs(liveProj[0]) > 1e-6f ? proj[0] / liveProj[0] : 1.0f;
+  const float sy =
+      std::fabs(liveProj[5]) > 1e-6f ? proj[5] / liveProj[5] : 1.0f;
   a.lastSeen = g_camFrame;
   const bool changed =
       live[0] != a.curr[0] || live[1] != a.curr[1] || live[2] != a.curr[2];
@@ -1567,6 +1719,9 @@ void ProjectBlended(PPCContext &ctx, bool radius) {
   for (int j = 0; j < 3; ++j)
     q[j] = pos[0] * view[j] + pos[1] * view[4 + j] + pos[2] * view[8 + j] +
            view[12 + j] - liveView[12 + j];
+  const float scale[3] = {sx, sy, 1.0f};
+  for (int j = 0; j < 3; ++j)
+    q[j] = (q[j] + liveView[12 + j]) * scale[j] - liveView[12 + j];
   float out[4];
   for (int i = 0; i < 3; ++i)
     out[i] = q[0] * liveView[4 * i] + q[1] * liveView[4 * i + 1] +
@@ -1609,7 +1764,7 @@ void OnGuestGameStep() {
     ++g_camFrame;
     PruneSnapshots();
     PruneViews();
-    PruneHUDAnchors();
+    g_hudAnchors.BeginFrame(g_camFrame);
     PruneAnimeClocks();
     g_recordKeys.clear();
     PruneBoneArrays();
@@ -1657,21 +1812,22 @@ REX_HOOK_RAW(bdBuildViewMatrix) {
       !ctx.r5.u32) {
     std::lock_guard<std::mutex> lock(g_interpMutex);
     u64 key = 0;
-    u32 scopeVO = 0;
     if (g_worldKey) {
       key = (1ull << 63) | g_worldKey;
-      scopeVO = u32(g_worldKey);
-    } else if (auto it = g_recordKeys.find(ctx.r3.u32 - 16);
+    } else if (auto it = g_recordKeys.find(ctx.r3.u32 - kRecMatrix);
                it != g_recordKeys.end()) {
       key = (1ull << 63) | it->second;
-      scopeVO = u32(it->second);
+    } else if (auto *rec = t_inRecordReplay ? bd::mem::try_at<const DrawRecord_t>(
+                                                 ctx.r3.u32 - kRecMatrix)
+                                           : nullptr) {
+      key = rec->Key();
     } else if (g_listObject) {
       key = (1ull << 62) | (u64(g_listSeq++) << 32) | g_listObject;
     } else {
       key = u64(ctx.r3.u32);
     }
     g_worldKey = 0;
-    if (!BoneBlendedVO(scopeVO) && !BoneArrayOwned(ctx.r3.u32)) {
+    if (!BoneArrayOwned(ctx.r3.u32)) {
       const bool depthPass = InShadowDepthPass();
       FloatSnapshot *e = nullptr;
       switch (AdvanceSnapshot(key, ctx.r3.u32, kWorldFloats, e)) {
@@ -1714,11 +1870,32 @@ REX_HOOK_RAW(bdBuildViewMatrix) {
   const u32 viewVa = bd::engine::InterpolationActive() ? ctx.r4.u32 : 0;
   auto *live = viewVa ? bd::mem::try_at<be_f32>(viewVa) : nullptr;
   if (live) {
-    if (viewVa == bd::engine::addr::kShadowLightView ||
-        viewVa == bd::engine::addr::kCubeShadowLightView) {
+    if (ProjectorView(viewVa)) {
       __imp__bdBuildViewMatrix(ctx, base);
       return;
     }
+    if (auto *liveProj =
+            ctx.r5.u32 ? bd::mem::try_at<be_f32>(ctx.r5.u32) : nullptr) {
+      float liveP[16];
+      ReadFloats(liveProj, liveP, 16);
+      float proj[16];
+      bool sharedProj = false;
+      {
+        std::lock_guard<std::mutex> lock(g_interpMutex);
+        MatrixTrack &e = g_views[ctx.r5.u32];
+        e.lastSeen = g_camFrame;
+        sharedProj = ServeProj(e, liveP, bd::engine::FrameTime(), proj);
+      }
+      if (!sharedProj) {
+        if (g_projScratch == 0)
+          g_projScratch = bd::gpu::HostHeap::Get().AllocGuest(64, 16);
+        if (g_projScratch != 0) {
+          WriteFloats(bd::mem::at<be_f32>(g_projScratch), proj, 16);
+          ctx.r5.u32 = g_projScratch;
+        }
+      }
+    }
+
     float liveView[16];
     ReadFloats(live, liveView, 16);
 
@@ -1726,7 +1903,7 @@ REX_HOOK_RAW(bdBuildViewMatrix) {
     bool shared = false;
     {
       std::lock_guard<std::mutex> lock(g_interpMutex);
-      ViewEntry &e = g_views[viewVa];
+      MatrixTrack &e = g_views[viewVa];
       e.lastSeen = g_camFrame;
       shared = ServeView(e, liveView, bd::engine::FrameTime(), view);
     }
@@ -1793,6 +1970,8 @@ namespace {
 
 constexpr u32 kAnimeVarTrackCap = 512;
 
+constexpr float kAnimeFirstFrame = 1.0f;
+
 } // namespace
 
 REX_EXTERN(__imp__D2AnimeTask_Draw);
@@ -1805,7 +1984,7 @@ REX_HOOK_RAW(D2AnimeTask_Draw) {
     return;
   }
 
-  const float live = static_cast<float>(task->animFrame);
+  const float live = static_cast<float>(task->animeData.frame);
   float prev = 0.0f;
   float curr = 0.0f;
   float alpha = 0.0f;
@@ -1821,7 +2000,7 @@ REX_HOOK_RAW(D2AnimeTask_Draw) {
     } else if (c.curr != live) {
       const bool cut = now - c.lastChange < kFastChangeSeconds ||
                        AnimeClockDiscontinuous(
-                           live - c.curr, static_cast<float>(task->animSpeed));
+                           live - c.curr, static_cast<float>(task->animeData.speed));
       c.prev = cut ? live : c.curr;
       c.curr = live;
       c.lastChange = now;
@@ -1837,8 +2016,12 @@ REX_HOOK_RAW(D2AnimeTask_Draw) {
     __imp__D2AnimeTask_Draw(ctx, base);
     return;
   }
-  const float lerped = prev + (curr - prev) * alpha;
-  task->animFrame = lerped;
+  const float lerped = std::max(prev + (curr - prev) * alpha, kAnimeFirstFrame);
+  if (lerped == live) {
+    __imp__D2AnimeTask_Draw(ctx, base);
+    return;
+  }
+  task->animeData.frame = lerped;
   const auto &tracks = task->animeData.varTracks;
   const u32 count = std::min<u32>(tracks.size(), kAnimeVarTrackCap);
   for (u32 i = 0; i < count; ++i) {
@@ -1850,7 +2033,12 @@ REX_HOOK_RAW(D2AnimeTask_Draw) {
                               offsetof(bd::engine::D2AnimeTask_t, animeData));
   }
   __imp__D2AnimeTask_Draw(ctx, base);
-  task->animFrame = live;
+  task->animeData.frame = live;
+}
+
+void bdAnimeChildClockFloorHook(PPCRegister &time) {
+  if (time.f64 < kAnimeFirstFrame)
+    time.f64 = kAnimeFirstFrame;
 }
 
 namespace {
@@ -1948,10 +2136,19 @@ REX_HOOK_RAW(bdVisualObjectCopyShadowBones) {
   e.copyTime = bd::engine::FrameTime();
 }
 
+REX_EXTERN(__imp__bdDrawRecordListReplay);
+REX_HOOK_RAW(bdDrawRecordListReplay) {
+  t_inRecordReplay = true;
+  __imp__bdDrawRecordListReplay(ctx, base);
+  t_inRecordReplay = false;
+}
+
 REX_EXTERN(__imp__bdCameraRender);
 REX_HOOK_RAW(bdCameraRender) {
+  const u32 vo = ctx.r3.u32;
   const bool outer = !t_inCameraRender;
   t_inCameraRender = true;
+  RegisterBoneArray(vo);
   __imp__bdCameraRender(ctx, base);
   if (outer)
     t_inCameraRender = false;

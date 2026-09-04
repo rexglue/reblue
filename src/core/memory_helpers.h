@@ -9,6 +9,8 @@
  */
 #pragma once
 
+#include <type_traits>
+
 #include <rex/system/kernel_state.h>
 #include <rex/types.h>
 
@@ -120,10 +122,26 @@ template <typename T> struct GuestVec {
   // Zero past the end, matching what the loads this replaced returned for an
   // empty vector.
   T operator[](u32 index) const {
-    return index < size() ? load<T>(address(index)) : T{};
+    if (index >= size())
+      return T{};
+    if constexpr (std::is_arithmetic_v<T>) {
+      return load<T>(address(index));
+    } else {
+      auto *p = try_at<const T>(address(index));
+      return p ? *p : T{};
+    }
   }
 };
 static_assert(sizeof(GuestVec<u32>) == 0x0C);
+
+template <typename T> struct GuestPtr {
+  be<u32> va;
+
+  u32 address() const { return static_cast<u32>(va); }
+  explicit operator bool() const { return address() != 0; }
+  T *get() const { return try_at<T>(address()); }
+};
+static_assert(sizeof(GuestPtr<int>) == 0x04);
 
 } // namespace mem
 } // namespace bd

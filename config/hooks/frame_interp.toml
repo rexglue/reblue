@@ -281,11 +281,18 @@ after_instruction = false
 jump_address_on_true = 0x8216FB00
 
 [[midasm_hook]]
-address = 0x821511E4
+address = 0x82151260
 name = "bdShaderAnimGateHook"
 registers = []
 after_instruction = false
 jump_address_on_true = 0x82151270
+
+[[midasm_hook]]
+address = 0x8215127C
+name = "bdShaderAnimGateHook"
+registers = []
+after_instruction = false
+jump_address_on_true = 0x8215128C
 
 [[midasm_hook]]
 address = 0x82406EEC
@@ -355,4 +362,40 @@ after_instruction = false
 address = 0x82442E6C
 name = "bdActEvClockMismatchHook"
 registers = ["r11"]
+after_instruction = false
+
+[[midasm_hook]]
+address = 0x823EFFE0
+name = "bdPopUpAgeLerpHook"
+registers = ["f13"]
+after_instruction = false
+
+[[midasm_hook]]
+address = 0x823F028C
+name = "bdPopUpAgeLerpHook"
+registers = ["f13"]
+after_instruction = false
+
+[[midasm_hook]]
+address = 0x823F048C
+name = "bdPopUpAgeLerpHook"
+registers = ["f12"]
+after_instruction = false
+
+[[midasm_hook]]
+address = 0x823F05B8
+name = "bdPopUpAgeLerpHook"
+registers = ["f0"]
+after_instruction = false
+
+[[midasm_hook]]
+address = 0x82153D34
+name = "bdAnimeChainEnableActiveHook"
+registers = ["r28"]
+after_instruction = false
+
+[[midasm_hook]]
+address = 0x821594FC
+name = "bdAnimeChildClockFloorHook"
+registers = ["f1"]
 after_instruction = false

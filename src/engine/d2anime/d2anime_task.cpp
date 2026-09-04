@@ -91,11 +91,11 @@ void D2AnimeTask::SetVisibleAndPlay(bool visible) {
 bool D2AnimeTask::IsVisible() const { return ref_ && (*this)->visible != 0; }
 
 float D2AnimeTask::AnimSpeed() const {
-  return ref_ ? static_cast<float>((*this)->animSpeed) : 0.0f;
+  return ref_ ? static_cast<float>((*this)->animeData.speed) : 0.0f;
 }
 
 float D2AnimeTask::AnimLength() const {
-  return ref_ ? static_cast<float>((*this)->animLength) : 0.0f;
+  return ref_ ? static_cast<float>((*this)->animeData.length) : 0.0f;
 }
 
 bool D2AnimeTask::IsAnimFinished() const {
@@ -115,13 +115,13 @@ void D2AnimeTask::SetAnimTime(float frame) {
 void D2AnimeTask::SetAnimSpeed(float speed) {
   if (!ref_)
     return;
-  (*this)->animSpeed = speed;
+  (*this)->animeData.speed = speed;
 }
 
 float D2AnimeTask::AnimTime() const {
   if (!ref_)
     return 0.0f;
-  return static_cast<float>((*this)->animFrame);
+  return static_cast<float>((*this)->animeData.frame);
 }
 
 void D2AnimeTask::Kill() {

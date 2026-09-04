@@ -906,6 +906,7 @@
 0x8227E9B0 = { name = "hcgVertexDeclarationRelease", size = 0x234 }
 0x8227ED50 = { name = "bdSceneGraphFindNodeByName", size = 0xA4 }
 0x8227F1D8 = { name = "bdSceneNodeDrawIndexed" }
+0x8227F360 = { name = "bdDrawRecordListReplay", size = 0xA68 }
 0x8227FEE8 = { name = "bdSceneNodeDrawSingle", size = 0x1E3C }
 0x82282410 = { name = "bdBoneInitUnskinned", size = 0x80 }
 0x82282490 = { name = "bdSceneNodeCullTraverse", size = 0x178 }

@@ -123,10 +123,6 @@ void ReadDeviceRenderState(VideoState &s, u32 device_guest) {
     Video::SetDirtyValue(dirty, ps.colorWriteEnable,
                          rs->colorWriteEnable & 0xFu);
 
-    // BD's door blackout is the sole user (bdCameraRender /
-    // bdSceneNodeDrawFurShells mode-4/5 blocks): a carve pass INCRs a doorway
-    // stencil mask, then the
-    // black pass draws ZFUNC=ALWAYS gated by NOTEQUAL ref 0.
     auto mask_or_default = [](be_u32 v) -> u8 {
       return v ? static_cast<u8>(v & 0xFFu) : 0xFFu;
     };

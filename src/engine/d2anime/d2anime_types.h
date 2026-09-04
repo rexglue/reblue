@@ -212,13 +212,44 @@ static_assert(offsetof(AnimeMenu_t, enableColor) == 0x164);
 static_assert(offsetof(AnimeMenu_t, needsRebuild) == 0x16C);
 static_assert(offsetof(AnimeMenu_t, shoulderPageJump) == 0x170);
 
+struct AnimeData_t;
+
+struct AnimeElement_t {
+  /* 0x00 */ u8 _pad00[0xC4];
+  /* 0xC4 */ mem::GuestPtr<AnimeData_t> childAnime;
+  /* 0xC8 */ be_f32 timer;
+};
+static_assert(offsetof(AnimeElement_t, childAnime) == 0xC4);
+static_assert(offsetof(AnimeElement_t, timer) == 0xC8);
+
+struct AnimeChainNode_t {
+  /* 0x00 */ u8 _pad00[0x50];
+  /* 0x50 */ mem::GuestVec<mem::GuestPtr<AnimeElement_t>> elements;
+};
+static_assert(offsetof(AnimeChainNode_t, elements) == 0x50);
+
 struct AnimeData_t {
   /* 0x000 */ u8 _pad000[0xC0];
   /* 0x0C0 */ mem::GuestVec<u32> varTracks;
   /* 0x0CC */ u8 _pad0CC[0x138 - 0xCC];
+  /* 0x138 */ be_f32 length;
+  /* 0x13C */ be_u32 state;
+  /* 0x140 */ u8 _pad140[0x150 - 0x140];
+  /* 0x150 */ be_f32 frame;
+  /* 0x154 */ be_f32 speed;
+  /* 0x158 */ u8 _pad158[0x160 - 0x158];
+  /* 0x160 */ be_u32 childEnabled;
+  /* 0x164 */ u8 _pad164[0x178 - 0x164];
+  /* 0x178 */ mem::GuestVec<mem::GuestPtr<AnimeChainNode_t>> activeChain;
 };
-static_assert(offsetof(AnimeData_t, varTracks) == 0xC0);
-static_assert(sizeof(AnimeData_t) == 0x138);
+static_assert(offsetof(AnimeData_t, varTracks) == 0x0C0);
+static_assert(offsetof(AnimeData_t, length) == 0x138);
+static_assert(offsetof(AnimeData_t, state) == 0x13C);
+static_assert(offsetof(AnimeData_t, frame) == 0x150);
+static_assert(offsetof(AnimeData_t, speed) == 0x154);
+static_assert(offsetof(AnimeData_t, childEnabled) == 0x160);
+static_assert(offsetof(AnimeData_t, activeChain) == 0x178);
+static_assert(sizeof(AnimeData_t) == 0x184);
 
 struct D2AnimeTask_t {
   /* 0x000 */ u8 _pad000[0x58];
@@ -231,12 +262,7 @@ struct D2AnimeTask_t {
   /* 0x070 */ be_u32 loadState;     // kLoadState*, 1..3 while still loading
   // AnimeData subobject, with its own vtable, and where AnimeVarBag lives.
   /* 0x074 */ AnimeData_t animeData;
-  /* 0x1AC */ be_f32 animLength; // -1 = endless
-  /* 0x1B0 */ be_u32 animState;  // 6 playing, 7 finished
-  /* 0x1B4 */ u8 _pad1B4[0x10];
-  /* 0x1C4 */ be_f32 animFrame; // starts at 1.0
-  /* 0x1C8 */ be_f32 animSpeed; // negative plays the timeline backwards
-  /* 0x1CC */ u8 _pad1CC[0x6C];
+  /* 0x1F8 */ u8 _pad1F8[0x238 - 0x1F8];
   /* 0x238 */ be_u32 loopFlag; // zero = one-shot, then finished
   /* 0x23C */ u8 _pad23C[0x08];
   /* 0x244 */ mem::GuestVec<u32> menus; // vector<AnimeMenu*>
@@ -249,10 +275,6 @@ static_assert(offsetof(D2AnimeTask_t, destroyFlag) == 0x060);
 static_assert(offsetof(D2AnimeTask_t, visible) == 0x068);
 static_assert(offsetof(D2AnimeTask_t, autoPlay) == 0x06C);
 static_assert(offsetof(D2AnimeTask_t, loadState) == 0x070);
-static_assert(offsetof(D2AnimeTask_t, animLength) == 0x1AC);
-static_assert(offsetof(D2AnimeTask_t, animState) == 0x1B0);
-static_assert(offsetof(D2AnimeTask_t, animFrame) == 0x1C4);
-static_assert(offsetof(D2AnimeTask_t, animSpeed) == 0x1C8);
 static_assert(offsetof(D2AnimeTask_t, loopFlag) == 0x238);
 static_assert(offsetof(D2AnimeTask_t, animeData) == 0x074);
 static_assert(offsetof(D2AnimeTask_t, menus) == 0x244);
