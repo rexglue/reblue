@@ -11,8 +11,11 @@
 #include "gpu/frame.h"
 
 #include <atomic>
+#include <cstddef>
+#include <memory>
 #include <mutex>
 #include <unordered_set>
+#include <vector>
 
 #include <plume_render_interface.h>
 #if defined(REBLUE_D3D12)
@@ -126,6 +129,16 @@ void Video::QueueResourceDestroy(u32 guest_va, ResourceType type) {
     if (!g_destroy_pending.insert(guest_va).second)
       return; // already pending
   }
+  if (type == ResourceType::RenderTarget ||
+      type == ResourceType::DepthStencil) {
+    auto *surface = HostResourceHeap::FromGuest<GuestTexture>(guest_va);
+    if (surface && DetachIdleSurface(surface) &&
+        SurfacePool::Recycle(surface)) {
+      std::lock_guard lock(g_destroy_pending_mutex);
+      g_destroy_pending.erase(guest_va);
+      return;
+    }
+  }
   // Bucketed by the recording slot, drained when that slot is reused after its
   // fence. frame is atomic because this runs on guest threads.
   s.deferred_destroy[Video::RetireSlot("guest resource")].Queue(guest_va, type);
@@ -155,6 +168,44 @@ u32 Video::RetireSlot(const char *what) {
   return slot;
 }
 
+namespace {
+
+constexpr size_t kTextureFreesPerDrain = 24;
+constexpr size_t kTextureBacklogFlushAll = 512;
+
+void DrainTextureBacklog(VideoState &s) {
+  std::vector<std::unique_ptr<plume::RenderTexture>> batch;
+  {
+    std::lock_guard lock(s.mutex);
+    const size_t pending = s.texture_free_backlog.size();
+    if (!pending)
+      return;
+    if (pending > kTextureBacklogFlushAll) {
+      static std::atomic<u32> s_logged{0};
+      if (s_logged.fetch_add(1, std::memory_order_relaxed) < 8) {
+        BD_WARN("texture free backlog reached {}, flushing it in one drain",
+                pending);
+      }
+    }
+    const size_t take =
+        pending > kTextureBacklogFlushAll
+            ? pending
+            : (pending < kTextureFreesPerDrain ? pending
+                                               : kTextureFreesPerDrain);
+    batch.reserve(take);
+    for (size_t i = 0; i < take; ++i) {
+      batch.push_back(std::move(s.texture_free_backlog[i]));
+    }
+    const auto first = s.texture_free_backlog.begin();
+    s.texture_free_backlog.erase(
+        first, first + static_cast<std::ptrdiff_t>(take));
+  }
+  BD_CPU_ZONE("DrainTextureBacklog");
+  batch.clear();
+}
+
+} // namespace
+
 void DrainSlot(VideoState &s, u32 slot) {
   // Frees what the PREVIOUS DrainSlot(slot) parked. Any reference to those was
   // recorded no later than command_lists[slot], submitted at the intervening
@@ -166,6 +217,8 @@ void DrainSlot(VideoState &s, u32 slot) {
   {
     std::lock_guard lock(s.mutex);
     s.texture_view_graveyard[slot].clear();
+    for (auto &tex : s.texture_graveyard[slot])
+      s.texture_free_backlog.push_back(std::move(tex));
     s.texture_graveyard[slot].clear();
     s.buffer_graveyard[slot].clear();
     // Same boundary for bindless slots retired while this slot last recorded:
@@ -177,6 +230,7 @@ void DrainSlot(VideoState &s, u32 slot) {
     // a fence away.
     s.reclaiming_slot.store(-1, std::memory_order_relaxed);
   }
+  DrainTextureBacklog(s);
   // Unlocked: a pool rejection parks GPU objects.
   {
     BD_CPU_ZONE("DrainSurfaceReturns");

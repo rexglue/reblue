@@ -15,6 +15,7 @@
 
 #include "core/perf.h"
 #include "engine/engine.h"
+#include "gpu/device.h"
 #include "gpu/host_heap.h"
 #include "gpu/surface_pool.h"
 
@@ -184,6 +185,9 @@ void RecordFrameSample(const PresentBreakdown &b) {
     g_mem_carry.surf_hits = ps.hits;
     g_mem_carry.surf_misses = ps.misses;
     g_mem_carry.surf_parked_bytes = ps.parked_bytes;
+    const auto vm = Video::MemoryUsage();
+    g_mem_carry.vram_used = vm.used;
+    g_mem_carry.vram_budget = vm.budget;
     g_mem_carry.sys_heap_bytes = 0;
     if (auto *mem = REX_KERNEL_MEMORY()) {
       if (const auto *sysheap = mem->LookupHeap(0x00100000u)) {
@@ -201,6 +205,8 @@ void RecordFrameSample(const PresentBreakdown &b) {
   s.surf_hits = g_mem_carry.surf_hits;
   s.surf_misses = g_mem_carry.surf_misses;
   s.surf_parked_bytes = g_mem_carry.surf_parked_bytes;
+  s.vram_used = g_mem_carry.vram_used;
+  s.vram_budget = g_mem_carry.vram_budget;
   s.state = CurrentSceneState();
 
   PerfPush(s);

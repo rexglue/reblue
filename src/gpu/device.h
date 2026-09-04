@@ -82,6 +82,8 @@ public:
   static void NotifyTextureDestroyed(GuestTexture *dead,
                                      bool retire_bindings = true);
 
+  static bool DetachIdleSurface(GuestTexture *surface);
+
   // Drop a texture's framebuffer cache entries and its bindless slot
   // (fence-deferred). Takes state().mutex.
   static void RetireTextureBindings(GuestTexture *tex);
@@ -147,6 +149,12 @@ public:
   static bool BindDrawFramebufferLocked();
 
   static plume::RenderDevice *HostDevice();
+
+  struct VideoMemory {
+    u64 used = 0;
+    u64 budget = 0;
+  };
+  static VideoMemory MemoryUsage();
 
   // Live swapchain dimensions, or 0 if no swapchain yet.
   static u32 OutputWidth();
@@ -493,6 +501,8 @@ struct VideoState {
   // block-shared buffers use their own graveyard.
   std::vector<std::unique_ptr<plume::RenderBuffer>>
       buffer_graveyard[kNumFrames];
+
+  std::vector<std::unique_ptr<plume::RenderTexture>> texture_free_backlog;
 
   // pendingGPURead surfaces: the destroy-time materialize copy still reads them
   // from the unsubmitted list, so they reach SurfacePool one cycle late.

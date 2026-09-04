@@ -19,6 +19,8 @@
 
 #include <plume_render_interface.h>
 
+#include "core/profiling.h"
+
 #include "core/logging.h"
 #include "gpu/d3d.h"
 #include "gpu/device.h"
@@ -46,19 +48,18 @@ constexpr size_t kCountCap = 1024;
 constexpr u64 kLargeSurfaceBytes = 16ull * 1024 * 1024;
 
 constexpr u64 kAutoBudgetMin = 512ull * 1024 * 1024;
-constexpr u64 kAutoBudgetMax = 4096ull * 1024 * 1024;
-constexpr u64 kAutoBudgetNum = 1;
-constexpr u64 kAutoBudgetDen = 4;
+constexpr u64 kAutoBudgetMax = 8192ull * 1024 * 1024;
+constexpr u64 kAutoBudgetNum = 3;
+constexpr u64 kAutoBudgetDen = 8;
 constexpr u64 kBudgetCapPercent = 50;
-// A key acquired this recently is live working set: its last parked copy is not
-// spare capacity, since dropping it buys a guaranteed recreate next frame. Well
-// above one frame's churn (~20-35 parks).
 constexpr u64 kHotEpochs = 1024;
 
 // Working-set copies recycle LIFO and keep a fresh park time. An entry this
 // stale is a spare (menu spares, movie dims) whose VRAM is worth more than
 // skipping its one recreate.
 constexpr auto kIdleTrimAge = std::chrono::seconds(120);
+constexpr auto kIdleTrimAgeUnderPressure = std::chrono::seconds(15);
+constexpr u64 kTrimPressurePercent = 85;
 // Below this parked total the spares are not worth reclaiming.
 constexpr u64 kIdleTrimFloorBytes = 128ull * 1024 * 1024;
 constexpr auto kIdleTrimCadence = std::chrono::seconds(1);
@@ -93,6 +94,7 @@ struct KeyStats {
   u64 bytes = 0; // one surface of this key
   u64 hits = 0;
   u64 misses = 0;
+  u64 recycled = 0;
   u64 evicted_lru = 0;
   u64 rejected_percap = 0;
   u64 rejected_oversize = 0;
@@ -112,6 +114,7 @@ struct Pool {
   u64 next_epoch = 0;
   u64 hits = 0;
   u64 misses = 0;
+  u64 recycled = 0;
   u64 evicted_lru = 0;
   u64 trimmed_idle = 0;
   u64 rejected_percap = 0;
@@ -182,16 +185,23 @@ KeyStats &TouchKeyLocked(Pool &p, u64 key, u32 width, u32 height,
 
 void LogSummaryLocked(Pool &p) {
   const u64 total = p.hits + p.misses;
-  BD_INFO("[surface-pool] {} hits / {} misses ({:.1f}% reuse), evicted={} "
-          "trimmed={} rejected_percap={} rejected_oversize={}",
+  BD_INFO("[surface-pool] {} hits / {} misses ({:.1f}% reuse), recycled={} "
+          "evicted={} trimmed={} rejected_percap={} rejected_oversize={}",
           p.hits, p.misses,
-          total ? 100.0 * double(p.hits) / double(total) : 0.0, p.evicted_lru,
-          p.trimmed_idle, p.rejected_percap, p.rejected_oversize);
+          total ? 100.0 * double(p.hits) / double(total) : 0.0, p.recycled,
+          p.evicted_lru, p.trimmed_idle, p.rejected_percap,
+          p.rejected_oversize);
   BD_INFO("[surface-pool] parked {} surfaces {:.1f} MiB (peak {:.1f} MiB), "
           "budget {} MiB, caps per-key={} count={}",
           p.free_count, p.parked_bytes / 1048576.0,
           p.peak_parked_bytes / 1048576.0, ByteBudget(p) / 1048576, kPerKeyCap,
           kCountCap);
+  const auto vm = Video::MemoryUsage();
+  if (vm.budget) {
+    BD_INFO("[surface-pool] adapter VRAM {:.0f} MiB in use of {:.0f} MiB "
+            "budget",
+            vm.used / 1048576.0, vm.budget / 1048576.0);
+  }
   // Rank by what a miss actually costs: misses x surface bytes.
   std::vector<const KeyStats *> rows;
   rows.reserve(p.stats.size());
@@ -204,9 +214,9 @@ void LogSummaryLocked(Pool &p) {
   for (size_t i = 0; i < n; ++i) {
     const KeyStats &k = *rows[i];
     BD_INFO("[surface-pool]   {}x{} {} fmt={} msaa={} {:.1f} MiB | hit={} "
-            "miss={} lru_evict={} percap={} parked={} peak={}",
+            "miss={} recycled={} lru_evict={} percap={} parked={} peak={}",
             k.width, k.height, k.is_depth ? "DS" : "RT", k.format,
-            k.sample_count, k.bytes / 1048576.0, k.hits, k.misses,
+            k.sample_count, k.bytes / 1048576.0, k.hits, k.misses, k.recycled,
             k.evicted_lru, k.rejected_percap + k.rejected_oversize, k.parked,
             k.parked_peak);
   }
@@ -217,6 +227,9 @@ void LogSummaryLocked(Pool &p) {
 // graveyard rather than being destroyed inline. Caller must NOT hold the pool
 // lock, since parking takes state().mutex.
 void RetireEvicted(std::vector<GuestTexture *> &evicted) {
+  if (evicted.empty())
+    return;
+  BD_CPU_ZONE("SurfacePoolRetireEvicted");
   for (GuestTexture *victim : evicted) {
     Video::RetireTextureBindings(victim);
     ParkTextureGPUObjects(victim);
@@ -230,11 +243,19 @@ void RetireEvicted(std::vector<GuestTexture *> &evicted) {
 // lock; victims go through RetireEvicted.
 void TrimIdleLocked(Pool &p, std::chrono::steady_clock::time_point now,
                     std::vector<GuestTexture *> &evicted) {
+  if (p.parked_bytes <= kIdleTrimFloorBytes)
+    return;
+  BD_CPU_ZONE("SurfacePoolTrimIdle");
+  const u64 budget = ByteBudget(p);
+  const auto trim_age =
+      p.parked_bytes > budget / 100 * kTrimPressurePercent
+          ? kIdleTrimAgeUnderPressure
+          : kIdleTrimAge;
   while (p.parked_bytes > kIdleTrimFloorBytes) {
     std::vector<Entry> *bucket = nullptr;
     size_t idx = 0;
     u64 key = 0;
-    auto oldest = now - kIdleTrimAge;
+    auto oldest = now - trim_age;
     for (auto &kv : p.free) {
       const auto sit = p.stats.find(kv.first);
       if (sit != p.stats.end() &&
@@ -286,13 +307,10 @@ bool EvictVictimLocked(Pool &p, u64 wanted_key,
     const bool expensive =
         sit != p.stats.end() && sit->second.bytes >= kLargeSurfaceBytes;
     const bool surplus = bucket.size() > 1;
-    const bool hot =
-        !surplus && sit != p.stats.end() &&
-        p.next_epoch - sit->second.last_acquire_epoch <= kHotEpochs;
-    if (hot && !allow_hot)
-      continue;
     for (size_t i = 0; i < bucket.size(); ++i) {
       const u64 epoch = bucket[i].epoch;
+      if (!allow_hot && p.next_epoch - epoch <= kHotEpochs)
+        continue;
       const bool better =
           !found || (surplus && !best_surplus) ||
           (surplus == best_surplus &&
@@ -337,8 +355,11 @@ bool EvictVictimLocked(Pool &p, u64 wanted_key,
   return true;
 }
 
+enum class ParkSource { Fenced, Release };
+
 // True when the surface was parked.
-bool ReturnLocked(GuestTexture *surface, std::vector<GuestTexture *> &evicted) {
+bool ReturnLocked(GuestTexture *surface, std::vector<GuestTexture *> &evicted,
+                  ParkSource source) {
   const bool is_depth = surface->type == ResourceType::DepthStencil;
   const u32 format = static_cast<u32>(surface->format);
   const u32 samples = static_cast<u32>(surface->sampleCount);
@@ -360,8 +381,15 @@ bool ReturnLocked(GuestTexture *surface, std::vector<GuestTexture *> &evicted) {
     ++ks.rejected_percap;
     return false; // caller frees it
   }
-  while ((p.parked_bytes + ks.bytes > budget || p.free_count >= kCountCap) &&
-         EvictVictimLocked(p, key, evicted, /*allow_hot=*/false)) {
+  if (source == ParkSource::Release &&
+      (p.parked_bytes + ks.bytes > budget || p.free_count >= kCountCap)) {
+    return false;
+  }
+  if (p.parked_bytes + ks.bytes > budget || p.free_count >= kCountCap) {
+    BD_CPU_ZONE("SurfacePoolEvictScan");
+    while ((p.parked_bytes + ks.bytes > budget || p.free_count >= kCountCap) &&
+           EvictVictimLocked(p, key, evicted, /*allow_hot=*/false)) {
+    }
   }
   const u64 ceiling = HardCeiling(p, budget);
   if (p.parked_bytes + ks.bytes > budget) {
@@ -374,14 +402,21 @@ bool ReturnLocked(GuestTexture *surface, std::vector<GuestTexture *> &evicted) {
               ceiling / 1048576);
     }
   }
-  while ((p.parked_bytes + ks.bytes > ceiling || p.free_count >= kCountCap) &&
-         EvictVictimLocked(p, key, evicted, /*allow_hot=*/true)) {
+  if (p.parked_bytes + ks.bytes > ceiling || p.free_count >= kCountCap) {
+    BD_CPU_ZONE("SurfacePoolEvictScanHot");
+    while ((p.parked_bytes + ks.bytes > ceiling || p.free_count >= kCountCap) &&
+           EvictVictimLocked(p, key, evicted, /*allow_hot=*/true)) {
+    }
   }
   p.free[key].push_back(
       {surface, p.next_epoch++, std::chrono::steady_clock::now()});
   p.ever_parked.insert(key);
   ++p.free_count;
   ++ks.parked;
+  if (source == ParkSource::Release) {
+    ++p.recycled;
+    ++ks.recycled;
+  }
   if (ks.parked > ks.parked_peak)
     ks.parked_peak = ks.parked;
   p.parked_bytes += ks.bytes;
@@ -554,13 +589,41 @@ GuestTexture *SurfacePool::Acquire(u32 width, u32 height, u32 guest_format,
   return surface;
 }
 
-bool SurfacePool::Return(GuestTexture *surface) {
+namespace {
+
+bool ParkSurface(GuestTexture *surface, ParkSource source) {
   if (!surface || !surface->texture)
     return false;
   std::vector<GuestTexture *> evicted;
-  const bool parked = ReturnLocked(surface, evicted);
+  const auto t0 = std::chrono::steady_clock::now();
+  const bool parked = ReturnLocked(surface, evicted, source);
+  const size_t swept = evicted.size();
   RetireEvicted(evicted);
+  if (swept) {
+    const double ms = std::chrono::duration<double, std::milli>(
+                          std::chrono::steady_clock::now() - t0)
+                          .count();
+    if (ms > 1.0) {
+      static std::atomic<u32> s_logged{0};
+      if (s_logged.fetch_add(1, std::memory_order_relaxed) < 32) {
+        BD_WARN("SurfacePool sweep {:.2f}ms evicted {} surfaces to park "
+                "{}x{} {}",
+                ms, swept, surface->width, surface->height,
+                surface->type == ResourceType::DepthStencil ? "DS" : "RT");
+      }
+    }
+  }
   return parked;
+}
+
+} // namespace
+
+bool SurfacePool::Return(GuestTexture *surface) {
+  return ParkSurface(surface, ParkSource::Fenced);
+}
+
+bool SurfacePool::Recycle(GuestTexture *surface) {
+  return ParkSurface(surface, ParkSource::Release);
 }
 
 void SurfacePool::Tick() {
@@ -602,6 +665,7 @@ SurfacePool::Stats SurfacePool::GetStats() {
   std::lock_guard<std::mutex> lock(p.mutex);
   return Stats{p.hits,
                p.misses,
+               p.recycled,
                p.evicted_lru,
                p.trimmed_idle,
                p.rejected_percap,

@@ -125,8 +125,8 @@ void PerfOverlay::DrawGraphs(ImGuiIO &io) {
     return;
 
   const u32 pts = std::min(n, kMaxPoints);
-  static std::vector<f32> t, a1, a2, a3, a4;
-  for (auto *v : {&t, &a1, &a2, &a3, &a4})
+  static std::vector<f32> t, a1, a2, a3, a4, a5;
+  for (auto *v : {&t, &a1, &a2, &a3, &a4, &a5})
     v->resize(pts);
 
   const f32 alpha = f32(Settings::Get().PerfOverlayAlpha()) / 100.0f;
@@ -205,12 +205,14 @@ void PerfOverlay::DrawGraphs(ImGuiIO &io) {
   fill(a2, [](S s) { return f32(s.heap_peak) / kMiB; });
   fill(a3, [](S s) { return f32(s.sys_heap_bytes) / kMiB; });
   fill(a4, [](S s) { return f32(s.surf_parked_bytes) / kMiB; });
+  fill(a5, [](S s) { return f32(s.vram_used) / kMiB; });
   if (ImPlot::BeginPlot("memory (MiB)", size, kFlags)) {
     ImPlot::SetupAxes("s", nullptr, kAx, kAx);
     ImPlot::PlotLine("heap", t.data(), a1.data(), int(pts));
     ImPlot::PlotLine("peak", t.data(), a2.data(), int(pts));
     ImPlot::PlotLine("sys", t.data(), a3.data(), int(pts));
     ImPlot::PlotLine("surf parked", t.data(), a4.data(), int(pts));
+    ImPlot::PlotLine("vram", t.data(), a5.data(), int(pts));
     ImPlot::EndPlot();
   }
 

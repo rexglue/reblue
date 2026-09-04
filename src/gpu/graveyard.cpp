@@ -28,6 +28,44 @@
 
 namespace bd::gpu {
 
+namespace {
+
+void DetachMirrorsLocked(VideoState &s, GuestTexture *dead) {
+  if (s.render_target == dead)
+    s.render_target = nullptr;
+  if (s.depth_stencil == dead)
+    s.depth_stencil = nullptr;
+  for (u32 i = 0; i < kNumFrames; ++i) {
+    if (s.last_drawn_rt[i] == dead)
+      s.last_drawn_rt[i] = nullptr;
+    if (s.last_drawn_ds[i] == dead)
+      s.last_drawn_ds[i] = nullptr;
+    if (s.fullscreen_chain_head[i] == dead)
+      s.fullscreen_chain_head[i] = nullptr;
+  }
+  if (s.scene_depth == dead)
+    s.scene_depth = nullptr;
+  if (s.last_resolved_dst == dead)
+    s.last_resolved_dst = nullptr;
+  for (auto it = s.subchain_resolve.begin(); it != s.subchain_resolve.end();) {
+    if (it->second == dead)
+      it = s.subchain_resolve.erase(it);
+    else
+      ++it;
+  }
+  for (auto &slot : s.textures) {
+    if (slot == dead)
+      slot = nullptr;
+  }
+  if (dead->mappedMemory) {
+    REX_KERNEL_MEMORY()->SystemHeapFree(dead->mappedMemory);
+    dead->mappedMemory = 0;
+  }
+  s.draw_framebuffer_bound = false;
+}
+
+} // namespace
+
 // Move every fence-sensitive GPU object owned by tex (image, SRV view, and the
 // companion textures' objects) into the current slot's graveyard. DrainSlot
 // only awaited THIS slot's fence, and the other in-flight slot's command buffer
@@ -251,42 +289,21 @@ void Video::NotifyTextureDestroyed(GuestTexture *dead, bool retire_bindings) {
     }
   }
   dead->destinationTextures.clear();
+  DetachMirrorsLocked(s, dead);
+}
 
-  // Null any mirror naming the dying texture. The engine releases bound
-  // surfaces silently and the next draw would otherwise read freed memory.
-  if (s.render_target == dead)
-    s.render_target = nullptr;
-  if (s.depth_stencil == dead)
-    s.depth_stencil = nullptr;
-  for (u32 i = 0; i < kNumFrames; ++i) {
-    if (s.last_drawn_rt[i] == dead)
-      s.last_drawn_rt[i] = nullptr;
-    if (s.last_drawn_ds[i] == dead)
-      s.last_drawn_ds[i] = nullptr;
-    if (s.fullscreen_chain_head[i] == dead)
-      s.fullscreen_chain_head[i] = nullptr;
+bool Video::DetachIdleSurface(GuestTexture *surface) {
+  if (!surface || !surface->texture)
+    return false;
+  auto &s = state();
+  std::lock_guard lock(s.mutex);
+  if (surface->pendingGPURead || surface->pendingDestroy ||
+      surface->sourceSurface || !surface->destinationTextures.empty() ||
+      s.render_target == surface || s.depth_stencil == surface) {
+    return false;
   }
-  if (s.scene_depth == dead)
-    s.scene_depth = nullptr;
-  if (s.last_resolved_dst == dead)
-    s.last_resolved_dst = nullptr;
-  for (auto it = s.subchain_resolve.begin(); it != s.subchain_resolve.end();) {
-    if (it->second == dead)
-      it = s.subchain_resolve.erase(it);
-    else
-      ++it;
-  }
-  for (auto &slot : s.textures) {
-    if (slot == dead)
-      slot = nullptr;
-  }
-  // Free the LockRect upload scratch, which is zero for never-locked textures.
-  if (dead->mappedMemory) {
-    REX_KERNEL_MEMORY()->SystemHeapFree(dead->mappedMemory);
-    dead->mappedMemory = 0;
-  }
-  // Force the next draw to re-resolve and re-bind its framebuffer.
-  s.draw_framebuffer_bound = false;
+  DetachMirrorsLocked(s, surface);
+  return true;
 }
 
 } // namespace bd::gpu

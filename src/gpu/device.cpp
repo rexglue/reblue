@@ -742,6 +742,42 @@ void Video::SetOverlayDrawHook(OverlayDrawHook hook) {
 
 plume::RenderDevice *Video::HostDevice() { return state().device.get(); }
 
+Video::VideoMemory Video::MemoryUsage() {
+  VideoMemory m;
+  auto *device = state().device.get();
+  if (!device)
+    return m;
+#if defined(REBLUE_D3D12)
+  auto *dev = static_cast<plume::D3D12Device *>(device);
+  IDXGIAdapter3 *adapter = nullptr;
+  if (!dev->adapter ||
+      dev->adapter->QueryInterface(IID_PPV_ARGS(&adapter)) < 0)
+    return m;
+  DXGI_QUERY_VIDEO_MEMORY_INFO info = {};
+  if (adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL,
+                                    &info) >= 0) {
+    m.used = info.CurrentUsage;
+    m.budget = info.Budget;
+  }
+  adapter->Release();
+#else
+  auto *dev = static_cast<plume::VulkanDevice *>(device);
+  if (!dev->allocator)
+    return m;
+  const VkPhysicalDeviceMemoryProperties *props = nullptr;
+  vmaGetMemoryProperties(dev->allocator, &props);
+  VmaBudget budgets[VK_MAX_MEMORY_HEAPS] = {};
+  vmaGetHeapBudgets(dev->allocator, budgets);
+  for (u32 i = 0; i < props->memoryHeapCount; ++i) {
+    if (props->memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) {
+      m.used += budgets[i].usage;
+      m.budget += budgets[i].budget;
+    }
+  }
+#endif
+  return m;
+}
+
 u32 Video::OutputWidth() {
   auto &s = state();
   return s.swap_chain ? s.swap_chain->getWidth() : 0;

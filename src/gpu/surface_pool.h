@@ -18,11 +18,6 @@ struct GuestTexture;
 // The engine creates and releases scratch surfaces every frame, each otherwise
 // a fresh committed D3D12 alloc. The dims it asks for repeat, so reuse beats
 // reallocating.
-//
-// GPU safety: Return() runs only from DrainSlot (post-fence,
-// post-NotifyTextureDestroyed), so a pooled surface is detached. It is idle
-// only against the slot DrainSlot awaited. The other in-flight slot's list can
-// still name it, so eviction retires a victim through the texture graveyard.
 class SurfacePool {
 public:
   // A surface ready to hand to the guest: a parked one of identical key,
@@ -36,6 +31,8 @@ public:
   // NotifyTextureDestroyed + fence.
   static bool Return(GuestTexture *surface);
 
+  static bool Recycle(GuestTexture *surface);
+
   // Once per frame from DrainSlot: ages out idle spares.
   static void Tick();
 
@@ -46,6 +43,7 @@ public:
   struct Stats {
     u64 hits = 0;   // Acquire matches (cumulative)
     u64 misses = 0; // Acquire misses -> fresh alloc (cumulative)
+    u64 recycled = 0;
     u64 evicted_lru = 0;
     u64 trimmed_idle = 0;
     u64 rejected_percap = 0;
