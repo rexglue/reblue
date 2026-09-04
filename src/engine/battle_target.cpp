@@ -6,6 +6,7 @@
  *              All rights reserved.
  * @license     BSD 3-Clause - see LICENSE
  */
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 
@@ -32,49 +33,13 @@ namespace bd::engine {
 
 namespace {
 
-// The battle scene, which bdBattleTargetSelectInput takes in r3 and the rest of
-// the battle code reaches through g_battleSubsystemActive.
-constexpr u32 kScene_CommandsBegin = 0x11C;
-constexpr u32 kScene_CommandsEnd = 0x120;
-constexpr u32 kScene_Selection = 0x1C0;
-constexpr u32 kScene_TargetGroup = 0x230;
-constexpr u32 kScene_TargetShape = 0x244;
-
-// One command entry per side, holding that side's target grid.
-constexpr u32 kCommandStride = 124;
-constexpr u32 kEntry_GroupsBegin = 0x04;
-constexpr u32 kEntry_GroupsEnd = 0x08;
-
-// Groups run across the field and each holds a front and a back slot, which is
-// the split bdBattleTargetStepGroup walks when left or right steps the group.
-constexpr u32 kGroupStride = 16;
-constexpr u32 kGroup_MembersBegin = 0x04;
-constexpr u32 kGroup_MembersEnd = 0x08;
-constexpr u32 kMemberStride = 32;
-constexpr u32 kMember_Actor = 0x18;
-constexpr u32 kMembersPerGroup = 2;
-
-// What the pending action covers. Zero reaches nothing and eight reaches
-// everything, and bdBattleTargetSelectInput skips its own movement code for
-// both, so neither leaves a target to point at.
-constexpr u32 kShape_Enabled = 0x28;
-constexpr u32 kShape_Mode = 0x20;
 constexpr u32 kShapeEverything = 8;
-
-constexpr u32 kActor_WorldPos = 0x1B8;
-
+constexpr i32 kPartBody = -1;
+constexpr u32 kMembersPerGroup = 2;
 constexpr u32 kVisualRenderVA = 0x82DC9848;
 
-// Design canvas units. The world position sits at the actor's feet, so the pick
-// point rises to roughly where the body reads, and the radius is about a
-// character's width at battle distance: wide enough to be easy to hit, short
-// enough that a pointer parked over the command window claims nobody.
 constexpr f32 kBodyRise = 60.0f;
 constexpr f32 kPickRadius = 140.0f;
-
-// bdVisualObjectGetHipsScreenDepth negates the third component to get a depth,
-// and the status icon stack at 0x82242C48 draws only while it is under one, so
-// this is the engine's own answer to whether a point is in front of the camera.
 constexpr f32 kFrontOfCamera = 1.0f;
 
 struct GuestVec3_t {
@@ -84,26 +49,73 @@ struct GuestVec3_t {
 };
 static_assert(sizeof(GuestVec3_t) == 0x0C);
 
-// What bdBattleTargetStepGroup copies over the scene's selection once a
-// candidate passes bdBattleTargetIsSelectable, and what
-// bdBattleTargetBuildSelection fills in at 0x822C5FA8.
-struct TargetSel_t {
+struct BattleActor_t {
+  /* 0x000 */ u8 _pad000[0x128];
+  /* 0x128 */ mem::GuestVec<mem::GuestPtr<BattleActor_t>> parts;
+  /* 0x134 */ u8 _pad134[0x1B8 - 0x134];
+  /* 0x1B8 */ GuestVec3_t worldPos;
+};
+static_assert(offsetof(BattleActor_t, parts) == 0x128);
+static_assert(offsetof(BattleActor_t, worldPos) == 0x1B8);
+
+struct BattleSelection_t {
   /* 0x00 */ be_u32 actor;
   /* 0x04 */ be_u32 side;
   /* 0x08 */ be_u32 commandSlot;
   /* 0x0C */ be_u32 group;
   /* 0x10 */ be_u32 member;
-  // The part of a multi-part enemy that takes the hit, which
-  // bdBattleTargetIsSelectable resolves and writes back. Minus one asks it to
-  // start over rather than keep the previous target's part.
   /* 0x14 */ be_i32 part;
   /* 0x18 */ be_u32 flags;
 };
-static_assert(sizeof(TargetSel_t) == 0x1C);
+static_assert(sizeof(BattleSelection_t) == 0x1C);
 
-// Guest scratch, pushed once per frame. The first 0x20 is left to the callee
-// stack parameter area, which a call writes at r1+8 and would otherwise put
-// straight over whatever was pushed at r1.
+struct BattleShape_t {
+  /* 0x00 */ u8 _pad00[0x20];
+  /* 0x20 */ be_u32 mode;
+  /* 0x24 */ u8 _pad24[0x28 - 0x24];
+  /* 0x28 */ be_u32 enabled;
+};
+static_assert(offsetof(BattleShape_t, mode) == 0x20);
+static_assert(offsetof(BattleShape_t, enabled) == 0x28);
+
+struct BattleMember_t {
+  /* 0x00 */ u8 _pad00[0x18];
+  /* 0x18 */ mem::GuestPtr<BattleActor_t> actor;
+  /* 0x1C */ u8 _pad1C[0x20 - 0x1C];
+};
+static_assert(offsetof(BattleMember_t, actor) == 0x18);
+static_assert(sizeof(BattleMember_t) == 0x20);
+
+struct BattleGroup_t {
+  /* 0x00 */ u8 _pad00[0x04];
+  /* 0x04 */ mem::GuestVec<BattleMember_t> members;
+};
+static_assert(offsetof(BattleGroup_t, members) == 0x04);
+static_assert(sizeof(BattleGroup_t) == 0x10);
+
+struct BattleCommand_t {
+  /* 0x00 */ u8 _pad00[0x04];
+  /* 0x04 */ mem::GuestVec<BattleGroup_t> groups;
+  /* 0x10 */ u8 _pad10[0x7C - 0x10];
+};
+static_assert(offsetof(BattleCommand_t, groups) == 0x04);
+static_assert(sizeof(BattleCommand_t) == 0x7C);
+
+struct BattleScene_t {
+  /* 0x000 */ u8 _pad000[0x11C];
+  /* 0x11C */ mem::GuestVec<BattleCommand_t> commands;
+  /* 0x128 */ u8 _pad128[0x1C0 - 0x128];
+  /* 0x1C0 */ BattleSelection_t selection;
+  /* 0x1DC */ u8 _pad1DC[0x230 - 0x1DC];
+  /* 0x230 */ be_u32 targetGroup;
+  /* 0x234 */ u8 _pad234[0x244 - 0x234];
+  /* 0x244 */ mem::GuestPtr<BattleShape_t> targetShape;
+};
+static_assert(offsetof(BattleScene_t, commands) == 0x11C);
+static_assert(offsetof(BattleScene_t, selection) == 0x1C0);
+static_assert(offsetof(BattleScene_t, targetGroup) == 0x230);
+static_assert(offsetof(BattleScene_t, targetShape) == 0x244);
+
 constexpr u32 kScratchBytes = 0x60;
 constexpr u32 kScratch_Sel = 0x20;
 constexpr u32 kScratch_Screen = 0x40;
@@ -113,20 +125,12 @@ struct Candidate {
   u32 actor = 0;
   u32 group = 0;
   u32 member = 0;
+  i32 part = kPartBody;
   f32 x = 0.0f;
   f32 y = 0.0f;
   f32 z = 0.0f;
   f32 distance = 0.0f;
 };
-
-// Guest vector of fixed-stride elements, as the battle code spells them out.
-u32 VectorCount(u32 objectVA, u32 beginOffset, u32 endOffset, u32 stride) {
-  const u32 begin = mem::try_field<u32>(objectVA, beginOffset);
-  const u32 end = mem::try_field<u32>(objectVA, endOffset);
-  if (!begin || end <= begin || !stride)
-    return 0;
-  return (end - begin) / stride;
-}
 
 // True while the pad, rather than the pointer, is moving the target: the same
 // four buttons bdBattleTargetSelectInput takes first out of its own poll.
@@ -146,10 +150,13 @@ void UpdateBattleTargetHover(PPCContext &ctx, u8 *base, u32 sceneVA) {
   // takes a confirm and a cancel.
   MenuMouse::Get().MarkInputOwned();
 
-  const u32 shape = mem::try_field<u32>(sceneVA, kScene_TargetShape);
-  if (!shape || mem::try_field<u32>(shape, kShape_Enabled) == 0)
+  auto *scene = mem::try_at<const BattleScene_t>(sceneVA);
+  if (!scene)
     return;
-  const u32 mode = mem::try_field<u32>(shape, kShape_Mode);
+  auto *shape = scene->targetShape.get();
+  if (!shape || shape->enabled == 0)
+    return;
+  const u32 mode = shape->mode;
   if (mode == 0 || mode == kShapeEverything)
     return;
 
@@ -165,22 +172,16 @@ void UpdateBattleTargetHover(PPCContext &ctx, u8 *base, u32 sceneVA) {
   if (!CursorInMenuSpace(pointerX, pointerY))
     return;
 
-  const auto *selection =
-      mem::try_at<const TargetSel_t>(sceneVA + kScene_Selection);
-  if (!selection)
-    return;
+  const BattleSelection_t *selection = &scene->selection;
   const u32 slot = selection->commandSlot;
-  if (slot >= VectorCount(sceneVA, kScene_CommandsBegin, kScene_CommandsEnd,
-                          kCommandStride))
+  if (slot >= scene->commands.size())
     return;
-  const u32 entry =
-      mem::try_field<u32>(sceneVA, kScene_CommandsBegin) + slot * kCommandStride;
-  const u32 groupCount =
-      VectorCount(entry, kEntry_GroupsBegin, kEntry_GroupsEnd, kGroupStride);
-  if (!groupCount)
+  auto *command =
+      mem::try_at<const BattleCommand_t>(scene->commands.address(slot));
+  if (!command || command->groups.empty())
     return;
 
-  const u32 targetGroup = mem::try_field<u32>(sceneVA, kScene_TargetGroup);
+  const u32 targetGroup = scene->targetGroup;
   const u32 visualRender = mem::load<u32>(kVisualRenderVA);
   if (!targetGroup || !visualRender)
     return;
@@ -193,81 +194,87 @@ void UpdateBattleTargetHover(PPCContext &ctx, u8 *base, u32 sceneVA) {
   const u32 scratch =
       rex::ppc::stack_push(frame.ctx, base, zeroed, kScratchBytes);
 
-  auto *scratchSel = mem::try_at<TargetSel_t>(scratch + kScratch_Sel);
+  auto *scratchSel = mem::try_at<BattleSelection_t>(scratch + kScratch_Sel);
   auto *world = mem::try_at<GuestVec3_t>(scratch + kScratch_World);
   const auto *screen = mem::try_at<const GuestVec3_t>(scratch + kScratch_Screen);
   if (!scratchSel || !world || !screen)
     return;
 
+  const auto accepts = [&](u32 actor, u32 g, u32 m, i32 part) {
+    *scratchSel = *selection;
+    scratchSel->actor = actor;
+    scratchSel->group = g;
+    scratchSel->member = m;
+    scratchSel->part = part;
+    return TargetIsSelectable(frame, base, targetGroup, actor,
+                              scratch + kScratch_Sel) != 0 &&
+           i32(scratchSel->part) == part;
+  };
+
   Candidate best{};
   bool found = false;
 
-  for (u32 g = 0; g < groupCount; ++g) {
-    const u32 group =
-        mem::try_field<u32>(entry, kEntry_GroupsBegin) + g * kGroupStride;
-    const u32 memberCount = VectorCount(group, kGroup_MembersBegin,
-                                        kGroup_MembersEnd, kMemberStride);
-    const u32 members =
-        memberCount < kMembersPerGroup ? memberCount : kMembersPerGroup;
+  for (u32 g = 0; g < command->groups.size(); ++g) {
+    auto *group = mem::try_at<const BattleGroup_t>(command->groups.address(g));
+    if (!group)
+      continue;
+    const u32 members = std::min(group->members.size(), kMembersPerGroup);
     for (u32 m = 0; m < members; ++m) {
-      const u32 member =
-          mem::try_field<u32>(group, kGroup_MembersBegin) + m * kMemberStride;
-      const u32 actor = mem::try_field<u32>(member, kMember_Actor);
+      auto *member =
+          mem::try_at<const BattleMember_t>(group->members.address(m));
+      if (!member)
+        continue;
+      const u32 actorVA = member->actor.address();
+      auto *actor = member->actor.get();
       if (!actor)
         continue;
 
-      // Ask the engine, exactly as bdBattleTargetStepGroup does: a fresh copy of
-      // the live selection with this cell written into it, which
-      // bdBattleTargetIsSelectable then either accepts or refuses.
-      *scratchSel = *selection;
-      scratchSel->actor = actor;
-      scratchSel->group = g;
-      scratchSel->member = m;
-      scratchSel->part = -1;
-      if (!TargetIsSelectable(frame, base, targetGroup, actor,
-                              scratch + kScratch_Sel))
-        continue;
+      const i32 partCount = i32(actor->parts.size());
+      for (i32 p = kPartBody; p < partCount; ++p) {
+        if (!accepts(actorVA, g, m, p))
+          continue;
 
-      const auto *pos = mem::try_at<const GuestVec3_t>(actor + kActor_WorldPos);
-      if (!pos)
-        continue;
-      *world = *pos;
-      WorldToScreenPos3(frame, base, visualRender, 0, scratch + kScratch_Screen,
-                        scratch + kScratch_World, 0);
+        auto *object = p == kPartBody ? actor : actor->parts[p].get();
+        if (!object)
+          continue;
+        *world = object->worldPos;
+        WorldToScreenPos3(frame, base, visualRender, 0,
+                          scratch + kScratch_Screen, scratch + kScratch_World,
+                          0);
 
-      Candidate c{};
-      c.actor = actor;
-      c.group = g;
-      c.member = m;
-      c.x = screen->x;
-      c.y = screen->y;
-      c.z = screen->z;
-      const f32 dx = c.x - pointerX;
-      const f32 dy = (c.y - kBodyRise) - pointerY;
-      c.distance = std::sqrt(dx * dx + dy * dy);
+        Candidate c{};
+        c.actor = actorVA;
+        c.group = g;
+        c.member = m;
+        c.part = p;
+        c.x = screen->x;
+        c.y = screen->y;
+        c.z = screen->z;
+        const f32 rise = p == kPartBody ? kBodyRise : 0.0f;
+        const f32 dx = c.x - pointerX;
+        const f32 dy = (c.y - rise) - pointerY;
+        c.distance = std::sqrt(dx * dx + dy * dy);
 
-      if (c.z >= kFrontOfCamera || c.distance > kPickRadius)
-        continue;
-      if (!found || c.distance < best.distance) {
-        best = c;
-        found = true;
+        if (c.z >= kFrontOfCamera || c.distance > kPickRadius)
+          continue;
+        if (!found || c.distance < best.distance) {
+          best = c;
+          found = true;
+        }
       }
     }
   }
 
-  if (!found || best.actor == u32(selection->actor))
+  if (!found)
+    return;
+  if (best.actor == u32(selection->actor) && best.part == i32(selection->part))
     return;
 
-  *scratchSel = *selection;
-  scratchSel->actor = best.actor;
-  scratchSel->group = best.group;
-  scratchSel->member = best.member;
-  scratchSel->part = -1;
-  if (!TargetIsSelectable(frame, base, targetGroup, best.actor,
-                          scratch + kScratch_Sel))
+  if (!accepts(best.actor, best.group, best.member, best.part))
     return;
 
-  auto *live = mem::try_at<TargetSel_t>(sceneVA + kScene_Selection);
+  auto *live = mem::try_at<BattleSelection_t>(
+      sceneVA + offsetof(BattleScene_t, selection));
   if (!live)
     return;
   *live = *scratchSel;
