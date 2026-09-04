@@ -39,4 +39,6 @@ f64 ShadowCoverageScale();
 
 f32 SceneRenderScale();
 
+u32 SceneRenderFactor();
+
 } // namespace bd::gpu

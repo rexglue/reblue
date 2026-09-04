@@ -11,6 +11,7 @@
  */
 #include "gpu/hooks/tweaks.h"
 
+#include <algorithm>
 #include <cmath>
 #include <unordered_map>
 
@@ -49,6 +50,10 @@ f32 SceneRenderScale() {
   return rate > 0.0f ? rate : 1.0f;
 }
 
+u32 SceneRenderFactor() {
+  return std::max(1u, static_cast<u32>(SceneRenderScale() + 0.5f));
+}
+
 } // namespace bd::gpu
 
 void bdSceneFSAASeedHook(PPCRegister &r11) {
@@ -61,6 +66,24 @@ void bdSceneRenderScaleHook(PPCRegister &r31) {
   bd::mem::try_store<f32>(
       r31.u32 + kVisualRenderRateOff,
       static_cast<f32>(bd::gpu::Settings::Get().SuperSampling()));
+}
+
+namespace {
+
+void ScaleIntermediateDims(PPCRegister &width, PPCRegister &height) {
+  const u32 factor = bd::gpu::SceneRenderFactor();
+  width.u32 /= factor;
+  height.u32 /= factor;
+}
+
+} // namespace
+
+void bdDofIntermediateScaleHook(PPCRegister &r28, PPCRegister &r26) {
+  ScaleIntermediateDims(r28, r26);
+}
+
+void bdBloomIntermediateScaleHook(PPCRegister &r4, PPCRegister &r5) {
+  ScaleIntermediateDims(r4, r5);
 }
 
 void bdReflectionResolutionScaleHook(PPCRegister &r31) {

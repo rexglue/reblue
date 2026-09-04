@@ -155,10 +155,10 @@ struct PresetBundle {
 };
 
 constexpr PresetBundle kPresets[kQualityPresetCount] = {
-    /* Low    */ {1, 0, 16, 1.0, 2048},
-    /* Medium */ {1, 2, 16, 2.0, 4096},
+    /* Low    */ {1, 0, 16, 1.0, 1024},
+    /* Medium */ {1, 2, 16, 2.0, 2048},
     /* High   */ {2, 2, 16, 2.0, 4096},
-    /* Ultra  */ {2, 8, 16, 4.0, 4096},
+    /* Ultra  */ {2, 8, 16, 4.0, 8192},
 };
 
 } // namespace

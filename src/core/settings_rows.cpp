@@ -189,15 +189,11 @@ constexpr i32 kAnisotropyOn = 16;
 constexpr SettingOption kAniso[] = {
     {.text = "On", .num = kAnisotropyOn, .key = "opt.on"},
     {.text = "Off", .num = 0, .key = "opt.off"}};
-// Combined sun shadow quality. Each step couples the coverage multiplier
-// (live) with a map dimension (restart) that holds texel density as coverage
-// grows, while the receiver PCF kernel scales by 1/distance so the penumbra
-// stays constant world size at any step. 3x/4x share 8192 (the dimension cap),
-// so 4x trades some density for reach.
-constexpr SettingOption kShadowQuality[] = {{.text = "1x", .num = 1.0, .num2 = 2048},
-                                     {.text = "2x", .num = 2.0, .num2 = 4096},
-                                     {.text = "3x", .num = 3.0, .num2 = 8192},
-                                     {.text = "4x", .num = 4.0, .num2 = 8192}};
+constexpr SettingOption kShadowQuality[] = {
+    {.text = "1x", .num = 1.0, .num2 = 1024},
+    {.text = "2x", .num = 2.0, .num2 = 2048},
+    {.text = "3x", .num = 3.0, .num2 = 4096},
+    {.text = "4x", .num = 4.0, .num2 = 8192}};
 constexpr SettingOption kRenderer[] = {
     {.text = "DX12",
      .num = 0,
