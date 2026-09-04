@@ -8,12 +8,17 @@
 #include "installer/installer_wizard.h"
 
 #include <imgui.h>
+#include <rex/filesystem.h>
 #include <rex/filesystem/devices/disc_image_device.h>
+#include <rex/platform/env.h>
 #include <stb_image.h>
+#include <vdflib.h>
 
 #include <algorithm>
 #include <cstring>
+#include <fstream>
 #include <functional>
+#include <stdexcept>
 
 #include "core/app_root.h"
 #include "core/encoding.h"
@@ -36,6 +41,129 @@ const char *T(const char *key) { return i18n::Text(key).c_str(); }
 ImFont *g_body_font = nullptr;
 ImFont *g_title_font = nullptr;
 ImFont *g_path_font = nullptr;
+
+std::filesystem::path ExecutablePath() {
+#if !defined(_WIN32)
+  if (auto appimage = rex::platform::env::get("APPIMAGE");
+      appimage && !appimage->empty())
+    return std::filesystem::absolute(*appimage);
+#endif
+  auto path = rex::filesystem::GetExecutableFolder();
+#if defined(_WIN32)
+  return path / "reblue.exe";
+#elif defined(__APPLE__)
+  // Inside a .app bundle the executable sits at Contents/MacOS/reblue; point
+  // Steam at the bundle itself so it launches (and shows an icon) like any
+  // other Mac app instead of a bare Unix binary.
+  if (path.filename() == "MacOS" && path.parent_path().filename() == "Contents") {
+    const auto bundle = path.parent_path().parent_path();
+    if (bundle.extension() == ".app")
+      return bundle;
+  }
+  return path / "reblue";
+#else
+  return path / "reblue";
+#endif
+}
+
+// Writes each embedded grid image out to a scratch dir (vdflib installs
+// artwork from a source file path, not a memory buffer) and hands it off to
+// vdflib to copy into Steam's per-user grid directory under the right name
+// for its slot.
+void InstallSteamArtwork(const std::filesystem::path& grid_dir,
+                         uint32_t app_id) {
+  struct ArtworkFile {
+    const char* name;
+    bd::EmbeddedAsset asset;
+    vdflib::ArtworkSlot slot;
+  };
+  constexpr auto kCover = bd::Embedded("installer/steamgrid/cover.png");
+  constexpr auto kHero = bd::Embedded("installer/steamgrid/hero.png");
+  constexpr auto kLogo = bd::Embedded("installer/steamgrid/logo.png");
+  constexpr auto kBackdrop = bd::Embedded("installer/steamgrid/backdropbd.png");
+  const ArtworkFile files[] = {
+      {"cover.png", kCover, vdflib::ArtworkSlot::Portrait},
+      {"hero.png", kHero, vdflib::ArtworkSlot::Hero},
+      {"logo.png", kLogo, vdflib::ArtworkSlot::Logo},
+      {"backdropbd.png", kBackdrop, vdflib::ArtworkSlot::Capsule},
+  };
+
+  const auto temp_dir = std::filesystem::temp_directory_path() /
+                        ("reblue-steamgrid-" + std::to_string(app_id));
+  std::filesystem::create_directories(temp_dir);
+  struct TempDirGuard {
+    std::filesystem::path path;
+    ~TempDirGuard() {
+      std::error_code ec;
+      std::filesystem::remove_all(path, ec);
+    }
+  } guard{temp_dir};
+
+  for (const auto& file : files) {
+    const auto source = temp_dir / file.name;
+    std::ofstream out(source, std::ios::binary | std::ios::trunc);
+    out.write(reinterpret_cast<const char*>(file.asset.data),
+              static_cast<std::streamsize>(file.asset.size));
+    out.close();
+    if (!out || !vdflib::installLocalArtwork(grid_dir, app_id, file.slot, source))
+      throw std::runtime_error(std::string("failed to install ") + file.name);
+  }
+}
+
+// Writes the app's own .ico out to the grid dir under the shortcut's app ID
+// and returns that path. This is the small icon Steam shows in the library
+// list/sidebar; distinct from (and unrelated to) the grid/hero/logo/capsule
+// artwork above, which only appears in the big-picture-style views.
+std::filesystem::path InstallSteamIcon(const std::filesystem::path& grid_dir,
+                                       uint32_t app_id) {
+  constexpr auto kIcon = bd::Embedded("installer/reblue.ico");
+  std::filesystem::create_directories(grid_dir);
+  const auto dest = grid_dir / (std::to_string(app_id) + "_icon.ico");
+  std::ofstream out(dest, std::ios::binary | std::ios::trunc);
+  out.write(reinterpret_cast<const char*>(kIcon.data),
+            static_cast<std::streamsize>(kIcon.size));
+  out.close();
+  if (!out) throw std::runtime_error("failed to install Steam icon");
+  return dest;
+}
+
+std::string AddSteamShortcut() {
+  try {
+    const auto steam = vdflib::findSteamInstallPath();
+    if (!steam) return i18n::Text("installer.steam.not_found");
+    const auto users = vdflib::listLocalSteamUserIds(*steam);
+    if (users.empty()) return i18n::Text("installer.steam.no_users");
+
+    const auto exe = ExecutablePath();
+    auto shortcut = vdflib::Shortcut::create(
+        "re:Blue", exe.string(), exe.parent_path().string());
+    const uint32_t app_id = shortcut.appid;
+    const auto grid_dir = vdflib::getGridDirectory(*steam, users.front());
+    const auto icon_path = InstallSteamIcon(grid_dir, app_id).string();
+
+    vdflib::ShortcutRepository repository(
+        vdflib::getShortcutsVdfPath(*steam, users.front()));
+    repository.load();
+    // A shortcut added before this icon existed never got one; catch it up
+    // rather than only setting the icon on brand-new entries.
+    if (auto* existing = repository.findByAppId(app_id)) {
+      if (existing->icon != icon_path) {
+        existing->icon = icon_path;
+        repository.save();
+      }
+    } else {
+      shortcut.icon = icon_path;
+      repository.addShortcut(std::move(shortcut));
+      repository.save();
+    }
+    InstallSteamArtwork(grid_dir, app_id);
+    BD_INFO("InstallerWizard: added Steam shortcut for user {}", users.front());
+    return i18n::Text("installer.steam.added");
+  } catch (const std::exception& e) {
+    BD_WARN("InstallerWizard: could not add Steam shortcut: {}", e.what());
+    return i18n::Fmt("installer.steam.failed", e.what());
+  }
+}
 } // namespace
 
 void InitInstallerFonts(ImFontAtlas *atlas) {
@@ -620,12 +748,14 @@ void InstallerWizard::DrawFooter() {
     page_ = Page::Content;
 
   // Repair mode offers one more way on: an install whose discs still check out
-  // can boot without copying anything.
-  const int forward = repair_ ? 2 : 1;
+  // can boot without copying anything. Adding the Steam shortcut lives under
+  // Preferences now, so the footer no longer carries a button for it.
+  float forward_width = kButtonWidth;
+  if (repair_)
+    forward_width += kGap + kButtonWidth;
   ImGui::SameLine();
   ImGui::SetCursorPosX(ImGui::GetCursorPosX() +
-                       ImGui::GetContentRegionAvail().x -
-                       forward * kButtonWidth - (forward - 1) * kGap);
+                       ImGui::GetContentRegionAvail().x - forward_width);
 
   if (repair_) {
     if (ImGui::Button(T("installer.button.done"), kButton))
@@ -739,6 +869,21 @@ void InstallerWizard::DrawPreferences() {
     if (ImGui::Checkbox(T("installer.option.reset_config"), &reset_config_))
       choices_.reset_config = reset_config_;
   }
+
+  // Repair already has an install on disk, so the shortcut can be written the
+  // moment it is asked for. A fresh install has nothing to point Steam at yet,
+  // so the button arms the shortcut instead and the install writes it on the
+  // way out; the label carries that difference.
+  if (repair_) {
+    if (ImGui::Button(T("installer.button.add_steam")))
+      AddSteamShortcutOnly();
+  } else {
+    if (ImGui::Button(add_steam_shortcut_ ? T("installer.steam.armed")
+                                          : T("installer.button.add_steam")))
+      add_steam_shortcut_ = !add_steam_shortcut_;
+  }
+  if (ImGui::IsItemHovered())
+    ImGui::SetTooltip("%s", T("installer.steam.hint"));
 }
 
 void InstallerWizard::DrawInstalling() {
@@ -792,6 +937,8 @@ void InstallerWizard::DrawInstalling() {
       done_success_ = true;
       done_message_ = i18n::Text(repair_ ? "installer.done.repair_complete"
                                          : "installer.done.complete");
+      if (add_steam_shortcut_)
+        done_message_ += "\n\n" + AddSteamShortcut();
       page_ = Page::Done;
     }
   }
@@ -822,6 +969,12 @@ void InstallerWizard::DrawDone() {
     if (ImGui::Button(T("installer.button.quit"), ImVec2(120, 0)))
       Finish(false);
   }
+}
+
+void InstallerWizard::AddSteamShortcutOnly() {
+  done_success_ = true;
+  done_message_ = AddSteamShortcut();
+  page_ = Page::Done;
 }
 
 void InstallerWizard::InitDLCCatalog() {

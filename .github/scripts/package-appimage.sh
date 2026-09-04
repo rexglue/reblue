@@ -28,6 +28,8 @@ if [ ${#libs[@]} -eq 0 ]; then
 fi
 cp "${libs[@]}" "${APPDIR}/usr/bin/"
 
+cp "${BUILD_DIR}"/libvdflib*.so* "${APPDIR}/usr/bin/" 2>/dev/null || true
+
 if ldd "${APPDIR}/usr/bin/reblue" | grep -q "not found"; then
   ldd "${APPDIR}/usr/bin/reblue" | grep "not found" >&2
   echo "::error::unresolved runtime dependencies"
